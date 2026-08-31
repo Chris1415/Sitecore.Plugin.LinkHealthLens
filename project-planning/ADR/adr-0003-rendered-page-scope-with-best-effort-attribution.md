@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted — **the fallback-label clause is narrowed by ADR-0006** (see Amendment below). The scope
+decision, the best-effort posture, the accepted duplicate reporting and the rejected
+full-attribution option all stand unchanged.
 
 ## Context
 
@@ -51,6 +53,23 @@ deduplicating across pages would require site-wide state, which ADR-0002 has no 
 **Rejected: full attribution for every chrome link.** It was offered and declined. It turns a
 one-endpoint read into a layout-resolution problem, and it depends entirely on what the page-HTML
 endpoint returns — which Assumption A1 says is unverified. It stays in § 15 Future Opportunities.
+
+## Amendment (2026-08-31, `/challenge-prd` ledger Q2 → ADR-0006)
+
+The Decision above says: *"where it cannot [be mapped to a field], the finding renders with the exact
+label `site chrome — not editable from this page`."* Read literally, that defines **chrome as
+whatever failed attribution** — which makes the attribution-rate metric M3 100% by construction and
+its exit gate unfailable.
+
+**ADR-0006 narrows that one clause.** `origin` is now decided **structurally**, and the chrome label
+applies only where `origin` is structurally `chrome`. A **content** link whose owning field could not
+be identified gets its own label, `in your content — field not identified`, because calling it site
+chrome would be false.
+
+**What is unchanged:** attribution remains **best-effort** — ADR-0006 changes what an attribution
+*failure* is called, not how hard the app tries, and not the A3 / M3 ≥ 50% threshold recorded above.
+The rendered-page scope, the accepted duplicate reporting and the rejection of full chrome
+attribution are all untouched.
 
 ## Date
 

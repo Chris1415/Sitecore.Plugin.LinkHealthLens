@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-08-31T14:45:00Z",
+  "updated_at": "2026-08-31T15:19:37.951Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -160,7 +160,9 @@
     "adrs": [
       "products/marketplace/link-health-lens/project-planning/ADR/adr-0002-mode-a-client-side-only.md",
       "products/marketplace/link-health-lens/project-planning/ADR/adr-0003-rendered-page-scope-with-best-effort-attribution.md",
-      "products/marketplace/link-health-lens/project-planning/ADR/adr-0004-extension-point-pages-contextpanel.md"
+      "products/marketplace/link-health-lens/project-planning/ADR/adr-0004-extension-point-pages-contextpanel.md",
+      "products/marketplace/link-health-lens/project-planning/ADR/adr-0005-status-set-with-display-precedence.md",
+      "products/marketplace/link-health-lens/project-planning/ADR/adr-0006-structural-origin-three-way-label.md"
     ],
     "architecture": null,
     "baseline": null,
@@ -212,6 +214,29 @@
       "started_at": "2026-08-31T14:36:00Z",
       "ended_at": "2026-08-31T14:45:00Z",
       "notes": "prd-000.md (18 headings) + mechanically extracted prd-minimal-000.md (7 sections) + 3 new ADRs. track=minimal, so ADRs carry the architecture."
+    },
+    {
+      "stage": "spec_ready",
+      "agent": "02-product-manager",
+      "outcome": "superseded",
+      "notes": "The drafted spec was replaced by the reviewed one at /challenge-prd close."
+    },
+    {
+      "stage": "spec_challenged",
+      "agent": "02-product-manager",
+      "outcome": "completed",
+      "started_at": "2026-08-31T14:50:00Z",
+      "ended_at": "2026-08-31T15:15:00Z",
+      "one_line": "light review; 13 challenges (3 blocker / 6 major / 4 minor); merged into prd-000.md",
+      "deliverables": [
+        "products/marketplace/link-health-lens/project-planning/specs/prd-000.md",
+        "products/marketplace/link-health-lens/project-planning/specs/prd-minimal-000.md",
+        "products/marketplace/link-health-lens/project-planning/ADR/adr-0005-status-set-with-display-precedence.md",
+        "products/marketplace/link-health-lens/project-planning/ADR/adr-0006-structural-origin-three-way-label.md"
+      ],
+      "escalations": [
+        "G3 — phase 1 needs a named tenant, a settled app_name and operator-guided App Studio registration; nothing in the run supplies them. Operator chose to settle it before /architect, so this close is a hard stop."
+      ]
     }
   ],
   "// stage_history — schema 7 contract": [
@@ -236,7 +261,7 @@
     "status": "not_started",
     "resumed_from_stage": null
   },
-  "next_action": "run /challenge-prd — cold-read critical review of prd-000 (auto-chained from /create-prd close)",
+  "next_action": "BLOCKED on operator action: name the tenant, settle app_name, complete Cloud Portal App Studio registration, and name a known-bad + known-good control page. Then /architect.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -292,6 +317,34 @@
       "type": "concern",
       "item": "gates.spec is off, so /challenge-prd will interrogate and then close SOFT rather than stopping for approval. The spec reaches /architect without a human confirmation step — that is the dial the operator set, recorded here so it is visible rather than inferred.",
       "status": "open"
+    },
+    {
+      "stage": "challenge-prd",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] G3 — before /architect: name the tenant, settle app_name, complete Cloud Portal App Studio registration (human Org Admin, no API — probe 0a), and name a known-bad page plus a known-good control page. Phase 1 is blocking and every phase exit is real-tenant-bound; without these the run reaches /implement and stops dead with nobody summoned. Operator chose 'settle it now' over an extra_stops entry.",
+      "status": "open"
+    },
+    {
+      "stage": "challenge-prd",
+      "type": "assumption",
+      "severity": "warn",
+      "item": "A4 (new) — the page-HTML endpoint exposes a structural signal sufficient to separate chrome from page content. The entire three-way label rests on it and nobody has seen it. T0 probe (f) is blocking; a refutation is an operator re-decision (R8), NOT an implementation fallback — reverting to attribution-derived origin would reinstate the unfailable M3 that ADR-0006 exists to prevent.",
+      "status": "open"
+    },
+    {
+      "stage": "challenge-prd",
+      "type": "concern",
+      "severity": "info",
+      "item": "The spec grew 561 -> 658 lines against the ~400 soft cap. The PM removed every duplication it introduced; the residue is requirement text the review obliged (6 new ACs, 2 new FRs, the status-set model, A4, R8, two probe questions, the phase preconditions). Further cuts would remove decisions, not padding. Operator call whether to trim.",
+      "status": "open"
+    },
+    {
+      "stage": "challenge-prd",
+      "type": "concern",
+      "severity": "info",
+      "item": "G1 and G2 were both blockers caused by the SAME thing: the mid-discovery reframe from broken-link checking to internal-link integrity was complete in the narrative sections and incomplete in the requirements layer. A spec can read as fully reframed in section 1 and still instruct an implementer to build the old product in section 7.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -327,7 +380,12 @@
       "imagery": "no active pack owns /author-content"
     },
     "grill_relay": "The grill ran inline via orchestrator relay rather than inside the spawned PM: an interactive multi-turn interrogation cannot interleave with the operator from a background subagent. The constructive spawn received the ledger PATH only (rule 72).",
-    "product_reframe": "Discovery Q4/Q5 changed the product. variables.mode = client-side removes every outbound network check, so broken-link / redirect-chain / DNS detection is PERMANENTLY out of scope and the spec is internal-link integrity. See ADR-0002."
+    "product_reframe": "Discovery Q4/Q5 changed the product. variables.mode = client-side removes every outbound network check, so broken-link / redirect-chain / DNS detection is PERMANENTLY out of scope and the spec is internal-link integrity. See ADR-0002.",
+    "critical_review": "completed",
+    "critical_review_level": "light",
+    "critical_review_questions": 4,
+    "critical_review_ledger": "products/marketplace/link-health-lens/project-planning/plans/interrogation-challenge-20260831T150500Z.md",
+    "critical_review_gaps": "13 total — 3 blocker, 6 major, 4 minor. Triage: 4 operator-decision (grilled), 8 self-resolvable (fixed without asking), 1 verifiable (routed to the T0 probe as question (e))."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,

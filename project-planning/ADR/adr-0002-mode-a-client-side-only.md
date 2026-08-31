@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted — **refined by ADR-0005**, which fixes what *not checked* means (reachability only) and
+keeps the two string-based checks running on external links. The decision itself is unchanged.
 
 ## Context
 
