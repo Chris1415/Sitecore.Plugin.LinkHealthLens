@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-08-31T15:19:37.951Z",
+  "updated_at": "2026-08-31T15:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -46,11 +46,11 @@
     "head_app_slug": null,
     "project_root": null,
     "cm_code_base": null,
-    "naming_source": "derived_from_slug",
+    "naming_source": "operator_supplied",
     "layout_deviation": null,
     "site_name": null,
     "editing_host_name": null,
-    "app_name": null
+    "app_name": "Link Health Lens"
   },
   "// variables": "Pack-declared build variables (`variables` in pack.json) once resolved — e.g. the Content SDK router, the Marketplace auth mode. Free-form by design: the owning pack defines the keys, so core cannot enumerate them.",
   "variables": {
@@ -261,7 +261,7 @@
     "status": "not_started",
     "resumed_from_stage": null
   },
-  "next_action": "BLOCKED on operator action: name the tenant, settle app_name, complete Cloud Portal App Studio registration, and name a known-bad + known-good control page. Then /architect.",
+  "next_action": "run /architect — ADR-first architecture pass (track: minimal, so ADRs carry it; no separate blueprint)",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -345,6 +345,13 @@
       "severity": "info",
       "item": "G1 and G2 were both blockers caused by the SAME thing: the mid-discovery reframe from broken-link checking to internal-link integrity was complete in the narrative sections and incomplete in the requirements layer. A spec can read as fully reframed in section 1 and still instruct an implementer to build the old product in section 7.",
       "status": "open"
+    },
+    {
+      "stage": "challenge-prd",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] G3 RESIDUAL — accepted by operator YES on 2026-08-31, run proceeds to /architect with it open. Before /implement: complete Cloud Portal App Studio registration for app 'Link Health Lens' on the devex tenant (human Org Admin, no API), name a known-bad page and a known-good control page, and supply a CM credential — none is present in the run environment. T0 is blocking and every phase exit is real-tenant-bound, so this stalls /implement rather than degrading it.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -385,7 +392,10 @@
     "critical_review_level": "light",
     "critical_review_questions": 4,
     "critical_review_ledger": "products/marketplace/link-health-lens/project-planning/plans/interrogation-challenge-20260831T150500Z.md",
-    "critical_review_gaps": "13 total — 3 blocker, 6 major, 4 minor. Triage: 4 operator-decision (grilled), 8 self-resolvable (fixed without asking), 1 verifiable (routed to the T0 probe as question (e))."
+    "critical_review_gaps": "13 total — 3 blocker, 6 major, 4 minor. Triage: 4 operator-decision (grilled), 8 self-resolvable (fixed without asking), 1 verifiable (routed to the T0 probe as question (e)).",
+    "tenant": "devex — the DevEx org test tenant, named by the operator 2026-08-31 in answer to blocker G3",
+    "app_name_rationale": "Kept as 'Link Health Lens' rather than renamed to match the internal-link-integrity scope. Confirmed once at the discovery checkpoint with the scope change known; required_at is before_scaffold, so the name enters tenant state at App Studio registration and a rename after that costs a re-registration. The honesty risk is handled in-product (global word ban + metric M5), not by the tile label.",
+    "g3_disposition": "PARTIALLY settled, remainder accepted by the operator with an explicit YES. Settled: tenant (devex) + app_name (Link Health Lens). Still outstanding before /implement: the operator-guided Cloud Portal App Studio registration (human Org Admin, no API), a named known-bad page and a named known-good control page, and a CM credential — no SITECORE_CM_* var is present in the run environment."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
