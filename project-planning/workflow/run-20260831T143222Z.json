@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-08-31T16:05:00Z",
+  "updated_at": "2026-08-31T17:25:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -56,7 +56,7 @@
   "variables": {
     "mode": "client-side"
   },
-  "status": "architecture_ready",
+  "status": "design_ready",
   "// work_item_type — schema 8 discriminator": [
     "work_item_type is the keystone discriminator set at intake by /create-prd (prd), /create-frd (frd), or /create-bug (bug). Every downstream command reads it to pick the weight-preset, the operator-gate count (prd=2, frd=1, bug=0+valves), and which stages to skip (bug skips architect+UI; frd skips architect+UI unless an ADR-worthy decision or UI scope exists).",
     "SAME ARTIFACT SLOTS, DIFFERENT FILL. canonical_artifacts.prd / prd_minimal hold the SPEC and SPEC-MINIMAL regardless of type — for an FRD they point at frd-NNN.md / frd-minimal-NNN.md; for a bug at bug-NNN.md / bug-minimal-NNN.md. The slot names stay `prd` / `prd_minimal` so downstream read paths (esp. Developer-08's `prd_minimal + task_breakdown`) are unchanged. The misnomer is intentional and documented.",
@@ -112,9 +112,17 @@
   ],
   "ui_design": {
     "proposal_count": 2,
-    "divergence": null,
-    "variant_paths": [],
-    "selected_variant_path": null
+    "divergence": "moderate",
+    "variant_paths": [
+      "products/marketplace/link-health-lens/project-planning/ui-design/ui-design-20260831T143222Z-v1.md",
+      "products/marketplace/link-health-lens/project-planning/ui-design/ui-design-20260831T143222Z-v2.md"
+    ],
+    "selected_variant_path": "products/marketplace/link-health-lens/project-planning/ui-design/ui-design-20260831T143222Z-v1.md",
+    "poc_paths": [
+      "products/marketplace/link-health-lens/project-planning/design-prototypes/poc-v1-prd000/index.html",
+      "products/marketplace/link-health-lens/project-planning/design-prototypes/poc-v2-prd000/index.html"
+    ],
+    "selected_poc_path": "products/marketplace/link-health-lens/project-planning/design-prototypes/poc-v1-prd000/"
   },
   "source": {
     "kind": "raw_idea",
@@ -260,6 +268,24 @@
       "agent": "04-software-architect",
       "outcome": "skipped",
       "one_line": "Operator-recommended skip; 7 ADRs but none has survived a second PRD and ADR-0006 is in flux behind probe A4"
+    },
+    {
+      "stage": "ui_ready",
+      "agent": "05-ui-designer",
+      "outcome": "completed",
+      "started_at": "2026-08-31T16:25:00Z",
+      "ended_at": "2026-08-31T17:25:00Z",
+      "one_line": "2 variants at moderate divergence; operator picked v1 'Triage by severity' at the design gate",
+      "deliverables": [
+        "products/marketplace/link-health-lens/project-planning/ui-design/ui-design-20260831T143222Z-v1.md",
+        "products/marketplace/link-health-lens/project-planning/ui-design/ui-design-20260831T143222Z-v2.md",
+        "products/marketplace/link-health-lens/project-planning/design-prototypes/poc-v1-prd000/",
+        "products/marketplace/link-health-lens/project-planning/design-prototypes/poc-v2-prd000/"
+      ],
+      "escalations": [
+        "Blok publishes no `warning` semantic role (OQ-A, open)",
+        "Two measured contrast failures on shadcn stock tokens; Blok's real values unmeasured (open)"
+      ]
     }
   ],
   "// stage_history — schema 7 contract": [
@@ -284,7 +310,7 @@
     "status": "not_started",
     "resumed_from_stage": null
   },
-  "next_action": "run /design — 2 divergent panel variants + POC clickdummies; carries the design gate (the only gate on)",
+  "next_action": "run /task-breakdown — Lead Developer task list + QA enrichment; section 5 MUST carry an explicit task owning the port of the POC's visual layer, and section 8 a per-tranche pixel compare against poc-v1-prd000",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -403,6 +429,55 @@
       "severity": "warn",
       "item": "getLivePageState declares its 200 body as `unknown`, so rule 40 cannot be satisfied by type alone for that one call. A 404 must be handled as DATA, not as an error — a generic retry/report handler would turn the app's headline finding into an infrastructure warning, which is the most likely way to implement this wrong.",
       "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "decision",
+      "severity": "warn",
+      "item": "OQ-A (both variants) — Blok publishes NO `warning` semantic role (primary / destructive / muted / accent / background / foreground; accent is a background role). Neither designer invented one. Severity rides on glyph + text chip + rail, so both designs stay legible and AA without it. If a warning token is wanted it is a Blok-side request, not a build task.",
+      "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "concern",
+      "severity": "warn",
+      "item": "Two MEASURED contrast failures, carried into the build regardless of winner: shadcn's stock --destructive #ef4444 is 3.76:1 on white and fails AA for the 13px row label (v1 shims one step darker to 4.83:1); muted-foreground on muted is 4.40:1, so neither design ever pairs them. v2 additionally measured the default `ring` token at 2.56:1 against background — under the 3:1 focus-indicator floor. Blok's REAL token values must be measured before ship; these are shadcn stock readings.",
+      "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "decision",
+      "severity": "warn",
+      "item": "OQ-B (v2 only) — v2's overview ruler has no Blok primitive. It is composed from Blok semantic tokens plus @blok/tooltip, which under ADR-0007 is an opt-out needing a recorded decision. If refused, the ruler goes and v2 still stands with weaker wayfinding. Only decidable if v2 wins.",
+      "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "decision",
+      "severity": "warn",
+      "item": "OQ-C (v2 only) — AC-7.2's reading: must the chrome/unattributed string be painted on EVERY row, or only on rows carrying a status? v2 paints it on rows with a status member and carries it via icon + aria-label on quiet rows. Painting it everywhere grows quiet rows a line and lengthens the walk by ~40%. Needs a ruling, not a guess.",
+      "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "assumption",
+      "severity": "warn",
+      "item": "v2's region banding depends on Assumption A4 (a structural chrome/content signal from the page-HTML endpoint, T0 probe f). If A4 is refuted the banding and canvas affinity die; the ruler, walked markers, filters and row anatomy survive. v1 does not depend on A4 for its grouping, only for the three-way label both share.",
+      "status": "open"
+    },
+    {
+      "stage": "design",
+      "type": "concern",
+      "severity": "info",
+      "item": "OQ-B and OQ-C are MOOT — both were v2-only (the ruler's Blok opt-out, and AC-7.2's painting rule as v2 read it). v1 won, so neither needs a ruling. Recorded rather than silently dropped, since both were raised to the operator as open decisions.",
+      "status": "resolved"
+    },
+    {
+      "stage": "design",
+      "type": "concern",
+      "severity": "warn",
+      "item": "v1's urgency-first ordering leads the editor to what will hurt rather than what they can fix here — on a chrome-heavy page, 12 findings and none actionable (state-chrome-only.html). The chrome counts on the verdict sub-line and per group are LOAD-BEARING MITIGATION, not decoration. An implementer who drops them as visual noise reinstates the trade-off unmitigated.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -455,7 +530,14 @@
     "sdk_gate": "SATISFIED by a types-only install at /architect (operator-chosen option 1). @sitecore-marketplace-sdk/client@0.3.6 + /xmc@0.4.2 installed at the product root — NOT in site/, so the scaffold's target stays empty and /implement does not hit the non-empty-target path. package.json + package-lock.json are committed, so every .d.ts citation is reproducible.",
     "sdk_gate_findings": "The install immediately refuted a spec assumption. (1) A1 RESOLVED from the type: Agent.PageHtmlResponse = { pageId: string; html: string } — the endpoint returns HTML as a string, not layout JSON, so the extraction design stands. (2) A2 REFUTED IN SHAPE: the real key is xmc.agent.pagesGetPagePathByLiveUrl, keyed on live_url, and its response carries NO publish-state field — one call cannot separate missing from unpublished. The distinction needs a second call, xmc.pages.getLivePageState, where a 404 IS the not-published signal. Recorded as ADR-0008. (3) getLivePageState's 200 body is declared `unknown`, so rule 40 cannot be satisfied by type alone — T0 probe (b) is narrowed to capturing that body rather than asking whether the distinction exists. (4) `language` is a REQUIRED query param on both calls, which is the language axis G4 raised at /challenge-prd.",
     "baseline_promoted": "skipped — 7 non-boilerplate ADRs, threshold met, but the gate promotes decisions that have survived 2+ PRDs and every ADR here is hours old from a single PRD, with ADR-0006 in active flux behind probe A4. Promoting now would freeze an untested constitution.",
-    "pack_fix_agreed": "Operator chose option 3 as the standing fix: give platform:marketplace a sanctioned types-only install step before /architect, so the next Marketplace run does not meet this wall. To be applied to the pack, not to this product."
+    "pack_fix_agreed": "Operator chose option 3 as the standing fix: give platform:marketplace a sanctioned types-only install step before /architect, so the next Marketplace run does not meet this wall. To be applied to the pack, not to this product.",
+    "design_divergence_rationale": "moderate, not radical — ADR-0007 fixes typography, colour and component vocabulary to Blok, so the only legal axes of divergence are layout, information hierarchy and finding-row presentation. v1 'Triage by severity' groups by what the editor should do; v2 'Walk the page in order' lists in document order so the panel mirrors the canvas. Genuinely different organising principles inside one token system.",
+    "design_brief_skills_gap": "PACK FINDING CANDIDATE. The /design brief for platform:marketplace carries constraints.blok-first-design ('design with Blok primitives; inventing custom markup where a Blok component exists is an opt-out needing an ADR') and iframe-viewport — but stages.design.skills is EMPTY. So the stage that ENFORCES design-system conformance is handed the mandate and no catalogue of what the system contains. 04b-design.md's own design-system-enforcement paragraph says to put the brief's 'skills + constraints' in the sub-agent prompt; the skills half resolves to nothing. Same family as F38: a requirement with no declared means to satisfy it. Worked around by naming blok-components / blok-theming / blok-marketplace-integration explicitly in both spawn prompts.",
+    "design_critic_skipped": "Step 4 scoring is optional and was skipped deliberately. The two variants differ on ONE stated axis (urgency-first vs position-first) and a 1-10 score across five dimensions would average that away. Both self-verified by rendering; each found and fixed a real defect in its own build, and v2 caught a factual error in v1's spec. The operator opening both clickdummies is the better instrument.",
+    "design_poc_contract_asymmetry": "v1 ships 45 discrete HTML frames; v2 ships 5 files plus URL-parameterised states (?view=row-open&n=89). v2's argument: 150 row instances would mean 150 files, and a query-param frame is equally specific and equally openable from file://. That satisfies the reviewability the click-targets rule exists for, but it is a different contract SHAPE, and /task-breakdown's Lead Developer plus QA's smoke both read that file. If v2 wins, the smoke plan must state that a post-state is a URL, not a path.",
+    "design_v1_spec_corrected": "v1's section 1 described v2 as ordering 'by fixability, chrome as a labelled tail' — the PRD section 11 SUGGESTED axis, not what v2 was built as. v2 flagged it; corrected in place before the operator read both, since an uncorrected line would have made the side-by-side comparison false.",
+    "design_winner": "v1 'Triage by severity' — picked by the operator at the design gate, not auto-selected. Robustness note worth carrying: v1's GROUPING does not depend on Assumption A4 (the structural chrome/content signal from T0 probe f); only the shared three-way label does. v2's region banding would have died with an A4 refutation, so the pick is also the more probe-resilient of the two.",
+    "design_poc_gate_script": "poc-v1-prd000/verify-poc.mjs is a 35-assertion gate that walks every reachable state and fails on a dangling href. It found the build's one real navigation defect. Run it at every tranche exit, not once at design close — a frame that stops honouring an ADR fails it."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
