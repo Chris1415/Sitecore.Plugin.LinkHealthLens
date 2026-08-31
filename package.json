@@ -1,0 +1,25 @@
+{
+  "name": "link-health-lens",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chris1415/Sitecore.Plugin.LinkHealthLens.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Chris1415/Sitecore.Plugin.LinkHealthLens/issues"
+  },
+  "homepage": "https://github.com/Chris1415/Sitecore.Plugin.LinkHealthLens#readme",
+  "dependencies": {
+    "@sitecore-marketplace-sdk/client": "^0.3.6",
+    "@sitecore-marketplace-sdk/xmc": "^0.4.2"
+  }
+}
