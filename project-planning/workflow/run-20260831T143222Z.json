@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-08-31T15:30:00Z",
+  "updated_at": "2026-08-31T15:45:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -86,7 +86,7 @@
     "content_authoring": null,
     "imagery": null,
     "external_reference": "cite",
-    "architecture_budget": null,
+    "architecture_budget": "mindful",
     "output_verbosity": "auto",
     "gate_presentation": null,
     "dual_review": "off"
@@ -162,7 +162,8 @@
       "products/marketplace/link-health-lens/project-planning/ADR/adr-0003-rendered-page-scope-with-best-effort-attribution.md",
       "products/marketplace/link-health-lens/project-planning/ADR/adr-0004-extension-point-pages-contextpanel.md",
       "products/marketplace/link-health-lens/project-planning/ADR/adr-0005-status-set-with-display-precedence.md",
-      "products/marketplace/link-health-lens/project-planning/ADR/adr-0006-structural-origin-three-way-label.md"
+      "products/marketplace/link-health-lens/project-planning/ADR/adr-0006-structural-origin-three-way-label.md",
+      "products/marketplace/link-health-lens/project-planning/ADR/adr-0007-blok-as-ui-framework.md"
     ],
     "architecture": null,
     "baseline": null,
@@ -261,7 +262,7 @@
     "status": "not_started",
     "resumed_from_stage": null
   },
-  "next_action": "run /architect — ADR-first architecture pass (track: minimal, so ADRs carry it; no separate blueprint)",
+  "next_action": "BLOCKED at /architect: the SDK contract verification gate cannot be satisfied — nothing is scaffolded, so there is no node_modules to cite and no captured fixture. Operator must override (YES) or the ordering must change.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -352,6 +353,20 @@
       "severity": "blocker",
       "item": "[BLOCKER] G3 RESIDUAL — accepted by operator YES on 2026-08-31, run proceeds to /architect with it open. Before /implement: complete Cloud Portal App Studio registration for app 'Link Health Lens' on the devex tenant (human Org Admin, no API), name a known-bad page and a known-good control page, and supply a CM credential — none is present in the run environment. T0 is blocking and every phase exit is real-tenant-bound, so this stalls /implement rather than degrading it.",
       "status": "open"
+    },
+    {
+      "stage": "architect",
+      "type": "concern",
+      "severity": "blocker",
+      "item": "[BLOCKER] SDK contract verification gate cannot be satisfied at /architect on platform:marketplace. It requires a .d.ts citation or a captured real-tenant shape per SDK call; the platform scaffolds nothing before /implement (so there is no node_modules) and the probe that would capture shapes is inside /implement behind an unfinished registration. Critical trigger (a) in this command's output rules. Either the operator overrides, or the SDK packages get installed early purely to read their types.",
+      "status": "open"
+    },
+    {
+      "stage": "architect",
+      "type": "decision",
+      "severity": "warn",
+      "item": "Baseline-promotion gate: 6 non-boilerplate ADRs, threshold >=5 met and no baseline.md exists. RECOMMEND SKIP — the gate promotes decisions that have survived 2+ PRDs, and every ADR here is hours old from a single PRD, with ADR-0006 in active flux (probe A4 could refute it). Promoting now would freeze a constitution that has never been tested.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -395,10 +410,24 @@
     "critical_review_gaps": "13 total — 3 blocker, 6 major, 4 minor. Triage: 4 operator-decision (grilled), 8 self-resolvable (fixed without asking), 1 verifiable (routed to the T0 probe as question (e)).",
     "tenant": "devex — the DevEx org test tenant, named by the operator 2026-08-31 in answer to blocker G3",
     "app_name_rationale": "Kept as 'Link Health Lens' rather than renamed to match the internal-link-integrity scope. Confirmed once at the discovery checkpoint with the scope change known; required_at is before_scaffold, so the name enters tenant state at App Studio registration and a rename after that costs a re-registration. The honesty risk is handled in-product (global word ban + metric M5), not by the tile label.",
-    "g3_disposition": "PARTIALLY settled, remainder accepted by the operator with an explicit YES. Settled: tenant (devex) + app_name (Link Health Lens). Still outstanding before /implement: the operator-guided Cloud Portal App Studio registration (human Org Admin, no API), a named known-bad page and a named known-good control page, and a CM credential — no SITECORE_CM_* var is present in the run environment."
+    "g3_disposition": "PARTIALLY settled, remainder accepted by the operator with an explicit YES. Settled: tenant (devex) + app_name (Link Health Lens). Still outstanding before /implement: the operator-guided Cloud Portal App Studio registration (human Org Admin, no API), a named known-bad page and a named known-good control page, and a CM credential — no SITECORE_CM_* var is present in the run environment.",
+    "planning_track": "minimal",
+    "adr_density_split": "n/a — 1 new ADR in this /architect run (ADR-0007), well under the 5-ADR density gate",
+    "required_adrs_check": "Pack declared 3 required_adrs. Scaffold choice -> ADR-0002 (pre-existing). Extension-point set -> ADR-0004 (pre-existing). Blok as UI framework -> MISSING, written now as ADR-0007. The gate caught a genuine undocumented default: no section of PRD-000 named a UI framework, so /implement would have inherited whatever the scaffold emitted.",
+    "sdk_gate_blocked": "Step 2a-bis / Validation demand a .d.ts citation or a captured real-tenant shape for every SDK call the architecture relies on. NEITHER IS OBTAINABLE AT THIS STAGE on this platform: repo_setup.deployable_baseline is null so no scaffold runs before /implement, which means no node_modules and no .d.ts; and the T0 probe that would capture real shapes lives inside /implement phase 1, behind an App Studio registration that has not happened and a CM credential that is not present. This is an ORDERING DEFECT IN THE PACK, not a defect in this spec — PRD-000 already marks all five surfaces unverified and pre-commits their capture to T0.",
+    "pack_finding_candidate": "platform:marketplace has no stage between /architect and /implement that can produce a .d.ts, yet /architect's own validation requires one for a Sitecore-track run. F36 item K fixed the naming half of probe-first-vs-scaffold-first (required_at: before_scaffold); this is the SDK-shape half and it is still open."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
   "// discovery_mode": "How the grill actually reached a human, if it did. `unattended` MUST carry discovery_questions_asked: 0 — a non-zero count there means answers were invented, which the interrogation protocol prohibits absolutely. Added 2026-08-26 after six runs each improvised their own free-text note because no field existed, and a fabricated ledger was indistinguishable from a real one on the manifest.",
-  "// source.portability_caveats": "NULL, never []. `method:clone` states: \"An empty caveat list is a CLAIM, not a default. On a real clone, empty is evidence the check did not run.\" The template shipped `[]` for one day (2026-08-27), so --init wrote the exact value the owning pack forbids and a run that left it would have read as \"we checked and found none\" while having asked nobody."
+  "// source.portability_caveats": "NULL, never []. `method:clone` states: \"An empty caveat list is a CLAIM, not a default. On a real clone, empty is evidence the check did not run.\" The template shipped `[]` for one day (2026-08-27), so --init wrote the exact value the owning pack forbids and a run that left it would have read as \"we checked and found none\" while having asked nobody.",
+  "architecture": {
+    "extension_points": [
+      {
+        "extension_point": "xmc:pages:contextpanel",
+        "route_url": "/pages-context",
+        "registered": false
+      }
+    ]
+  }
 }
