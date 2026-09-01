@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T10:15:00Z",
+  "updated_at": "2026-09-01T09:40:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -363,7 +363,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "OPERATOR DECISION: probe (g) refuted — field-level selection does not exist at runtime. Decide the jump affordance's fate, then TR-1 starts.",
+  "next_action": "/code-review on the TR-1 diff, then /test. TR-1's pixel-capture leg needs one operator-driven host-frame pass before the tranche fully closes.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -396,6 +396,12 @@
         "(g) field-level selection"
       ],
       "not_captured_reason": "Both need the app framed by an authenticated Cloud Portal Pages canvas; Mode A has no mock-client path."
+    },
+    "TR-1-exit": {
+      "outcome": "partial",
+      "verified_independently": "tests 16/16 · lint 0 errors (2 warnings) · verify-poc.mjs 35/35 · comment-density exit 0",
+      "not_done": "pixel capture-and-compare against poc-v1-prd000 at 320/360/400 in the real Cloud Portal host frame",
+      "not_done_reason": "Mode A has no mock-client path. Confirmed concretely rather than assumed: a throwaway local preview route rendered BLANK because MarketplaceProvider gates the whole tree until a real portal handshake resolves. Flagged in build-decisions.md and the task breakdown rather than silently marked passed."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -663,6 +669,20 @@
       "severity": "info",
       "item": "(b) remains ambiguous but now has a concrete lead rather than a dead end: query LIVE Edge for the target item via xmc.live.graphql (portal-brokered, declared SDK key) — present means published, absent means not, which is unambiguous where the 404 is not. TR-4 should try it before settling for AC-3.3's merged label.",
       "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "decision",
+      "severity": "warn",
+      "item": "TR-1 is code-complete and green on every automatable gate, but its PIXEL leg is not done and was not claimed. It needs one operator-driven host-frame pass: open the panel in the real devex Pages canvas at 320/360/400 and compare against poc-v1-prd000. Mode A has no mock-client path — a local preview route renders blank because MarketplaceProvider gates the tree until the handshake resolves. This recurs at EVERY tranche exit, so it is worth deciding once how it is handled rather than per tranche.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "concern",
+      "severity": "info",
+      "item": "CORRECTION: OQ-A ('Blok publishes no warning semantic role') is FALSE — six --warning-* tokens exist in the installed theme. Recorded because the claim reached the operator twice as fact. Separately, a genuine Blok defect was found: --primary-foreground (primary-600) on --primary (primary-500) measures 1.48:1 and fails AA. Worth an upstream report.",
+      "status": "resolved"
     }
   ],
   "// operator_attention — guidance": [
@@ -738,7 +758,9 @@
     "adr_0009_consequences_for_planning": "Three items TR-2/TR-4 must now carry that the old mechanism did not need: (1) strip query + fragment before lookup — the captured page has SEVEN ?to= variants of one page; (2) exclude media and non-page paths (/-/media/...) BEFORE lookup, or every PDF link reports as target-not-found, which is exactly the false-positive class M4 exists to catch; (3) internal-vs-external classification loses the host list (empty) and falls back to href SHAPE — relative means internal, absolute means external — which classifies 56 of 57 correctly on the measured page.",
     "dedup_saving_measured": "The captured page's 57 anchors reduce to 20 distinct — a 65% call saving before the first lookup. De-duplication now happens BEFORE resolution (by path), not after (by itemId) as ADR-0008 assumed.",
     "probe_d_design_wins": "Two things pages.context delivers that the plan did not know it had. (1) siteInfo.rootPath arrives with the context on every page selection, so ADR-0009 needs NO separate sites call to know the site root. (2) pageInfo.presentationDetails carries the full rendering list as JSON, each entry with { id, instanceId, placeholderKey, dataSource, parameters } — an attribution source far stronger than inferring from rendered HTML. It maps a REGION of the page to the ITEM backing it, which is most of the distance to an honest 'this link lives in X' affordance.",
-    "getvalue_not_implemented": "client.getValue() throws 'CoreError: [client SDK] getValue method is not implemented.' in 0.3.6. Irrelevant to this app (context panel, not custom field) but it means the custom-field read/write surface documented in the client skill does not exist in this SDK version."
+    "getvalue_not_implemented": "client.getValue() throws 'CoreError: [client SDK] getValue method is not implemented.' in 0.3.6. Irrelevant to this app (context panel, not custom field) but it means the custom-field read/write surface documented in the client skill does not exist in this SDK version.",
+    "oq_a_CORRECTED": "OQ-A was FALSE. Blok DOES publish a warning semantic role — six tokens verified in the installed theme: --warning, --warning-hover, --warning-active, --warning-background, --warning-background-active, --warning-foreground. The claim originated in the v1 UI Designer's report, was recorded as an open question at the design gate, and was relayed to the operator twice without being checked against the installed package. No build impact (severity rides on glyph + text chip + rail, which is right for a narrow panel regardless), but the design open question rested on a false premise.",
+    "blok_contrast_defect": "REAL DEFECT IN BLOK'S SHIPPED THEME, not a variant choice: --primary-foreground resolves to var(--color-primary-600) while --primary resolves to var(--color-primary-500) — two adjacent steps of the same ramp, measured at 1.48:1, failing AA badly in light mode. Worked around locally by substituting --background for the one POC rule using that pairing, which matches the pattern Blok's own Button already uses internally. Worth reporting upstream to the Blok team; it affects every consumer who pairs those two tokens as their names invite."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
