@@ -86,3 +86,18 @@ gate, which is what makes the below-50% escalation in A3 a real mechanism.
 ## Date
 
 2026-08-31
+
+## Amendment (2026-09-01, T0 probe (f) — A4 CONFIRMED, with a dependency)
+
+A4 holds: chrome and content **are** separable from the page HTML. But the signal is **semantic HTML
+landmarks**, not `data-*` attributes — the captured page contains no `data-component` /
+`data-placeholder` / `data-sc-*` at all. Measured on Zephira Home: `header` 6 anchors, `nav` 4,
+`footer` 4, `main` 49.
+
+**So this ADR survives and M3 stays failable** — the outcome this decision existed to secure.
+
+**The dependency is worth stating, because it is not what it appears to be:** landmarks are emitted by
+the **rendering app**, not by the SDK or the platform. This works because Content SDK's `Layout.tsx`
+emits them. A head app rendering plain `div`s would return the structural signal to *absent*, and on
+that site the three-way label would lose its basis — which is R8's operator re-decision, not an
+implementation fallback.

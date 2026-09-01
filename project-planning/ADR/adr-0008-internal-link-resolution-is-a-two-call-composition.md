@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted — **the two-step SHAPE stands; the first CALL is superseded by ADR-0009** (see Amendment below)
 
 ## Context
 
@@ -95,3 +95,16 @@ confident wrong answer, which is exactly the class of defect PRD-000 § 2 forbid
 ## Date
 
 2026-08-31
+
+## Amendment (2026-09-01, T0 probe (e) → ADR-0009)
+
+The Decision above names `xmc.agent.pagesGetPagePathByLiveUrl` as step 1. **The probe refuted it on
+the real tenant**: it resolves by hostname → site and **0 of 7 devex sites carry a `targetHostname`**,
+and it rejects relative URLs while **56 of 57 anchors on the captured page are relative**.
+
+**ADR-0009 replaces step 1** with an Authoring GraphQL lookup of the site-relative path against the
+site's own content tree (`xmc.authoring.graphql` — still Mode A, still no backing route).
+
+**What is unchanged:** the reasoning that ONE call cannot answer both *does this exist* and *is it
+published* — which is why ADR-0009 keeps the two-step shape — and **step 2**
+(`getLivePageState`, where the `404` is the not-live signal and must be handled as data, not an error).
