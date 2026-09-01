@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T11:00:00Z",
+  "updated_at": "2026-09-01T13:20:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "TR-2 (extraction). The visual leg is batched to ONE interactive pass at the build gate; the operator supplies the Pages canvas deep-link URL then.",
+  "next_action": "/code-review on the TR-2 diff, then TR-3 (host list + scope + string checks).",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -409,6 +409,13 @@
       "findings": "1 Critical (fixed), 0 Major, 1 Minor (fixed)",
       "critical": "The T006 probe harness — which reads live CM data — was still on disk and reachable from the production /pages-context route via a live link, while docs/build-decisions.md claimed it had already been deleted. Deleted both directories and the link; the false paragraph was corrected IN PLACE rather than silently rewritten.",
       "gates_reverified_by_orchestrator": "probe dirs gone, 0 links, 0 residual imports, 17/17 tests, lint 0 errors, verify-poc 35/35, comment-density exit 0"
+    },
+    "TR-2-exit": {
+      "outcome": "partial",
+      "verified_independently": "37/37 tests · lint 0 errors · build clean · verify-poc 35/35 · comment-density exit 0",
+      "not_done": "T019's live-canvas independent DOM query, and T020's pixel compare",
+      "not_done_reason": "Mode A has no mock-client path. Same treatment as TR-1's T014 — recorded, not claimed. The pixel compare is batched to the build gate by operator decision.",
+      "anchor_count_reconciled": "The extractor reports 59 anchors on the real Zephira Home fixture; the orchestrator's earlier regex measurement said 57. Both are right: 57 anchors carry an href, 2 carry none. The regex required href= and missed them. The DOMParser found them and gives each its own row rather than dropping it, which is what TR-3 needs to classify an empty or missing href. The extractor is MORE accurate than the number it was checked against."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -718,6 +725,13 @@
       "severity": "warn",
       "item": "ORCHESTRATOR ERROR, corrected: I claimed the probe ran against devex and called it 'proven not assumed', using __Revision as the estate discriminator. The estates are clones and the item was unedited, so the match was expected under either hypothesis — a non-discriminator treated as proof. The canvas URL shows devrel. Every finding was re-verified against devrel and is identical, so no design conclusion changes, but the reasoning was unsound and is recorded rather than quietly fixed.",
       "status": "resolved"
+    },
+    {
+      "stage": "implement",
+      "type": "assumption",
+      "severity": "info",
+      "item": "TR-2 modelled 'no language available' as health.pageHtml=false rather than a distinct scan-level status, because the data model has no such member. It is a reading of the contract, not an invention, and the Developer flagged it rather than deciding silently. QA can rename it at /test if a distinct status is wanted.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -800,7 +814,9 @@
     "critical_pattern_again": "The TR-1 Critical is the same shape as F38 and as this run's earlier findings: docs/build-decisions.md asserted the harness had been deleted, nothing gated that claim, and it was false. A status claim in prose has no gate. It was only caught because the reviewer was told to flag the harness IF IT LEAKED into the production path — a blanket 'ignore it, it is throwaway' would have missed it.",
     "visual_cadence_DECIDED": "Operator chose: ONE batched interactive visual pass at the BUILD GATE, not per tranche. No Playwright storageState, no persisted Cloud Portal session, no change to marketplace-sdk-host-frame-testing's no-persisted-session contract. Accepted cost, stated so it is not rediscovered as a surprise: a visual regression introduced in TR-2 will not surface until the build gate. Every tranche exit still runs its AUTOMATABLE gates in full — suite, lint, build, verify-poc.mjs and the comment-density audit — so this defers only the pixel comparison against the POC, not the tranche exit as a whole.",
     "canvas_url_pending": "The Cloud Portal Pages canvas deep-link URL for a devex-tenant page is a mandatory input for the build-gate visual pass. The operator will supply it. It is NOT needed for TR-2..TR-6 implementation, so it does not block the build.",
-    "probe_findings_reverified_on_devrel": "All load-bearing findings re-measured against devrel and IDENTICAL to devex: 0 of 7 sites carry a targetHostname; pagesGetPageHtml returns 200 {pageId, html}; Zephira Home has 57 anchors / 20 distinct / 56 relative / 0 absolute; landmarks header 6, nav 4, footer 4, main 49; no data-* structural hints; path-by-url 404s with 'No matching site found for hostname'. ADR-0009, ADR-0006 and ADR-0010 therefore stand on evidence from the tenant the app actually runs in. Devrel capture saved as captures/agent-page-html-zephira-home.DEVREL.json."
+    "probe_findings_reverified_on_devrel": "All load-bearing findings re-measured against devrel and IDENTICAL to devex: 0 of 7 sites carry a targetHostname; pagesGetPageHtml returns 200 {pageId, html}; Zephira Home has 57 anchors / 20 distinct / 56 relative / 0 absolute; landmarks header 6, nav 4, footer 4, main 49; no data-* structural hints; path-by-url 404s with 'No matching site found for hostname'. ADR-0009, ADR-0006 and ADR-0010 therefore stand on evidence from the tenant the app actually runs in. Devrel capture saved as captures/agent-page-html-zephira-home.DEVREL.json.",
+    "tr2_m2_control": "The M2 reconciliation harness compares the extractor against an INDEPENDENTLY implemented DOM query, not against its own output, and ships a working self-test control proving the comparison can fail. That is the anti-circularity requirement QA set at task-breakdown time, honoured rather than approximated.",
+    "tr2_language_guard": "usePageScan guards the case where no language is available on pageInfo or siteInfo, instead of defaulting to 'en'. Modelled as health.pageHtml=false plus an error state, because PageScan.health has no dedicated member. The Developer flagged this as a READING of the contract rather than a gap — QA may want it named distinctly at /test."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
