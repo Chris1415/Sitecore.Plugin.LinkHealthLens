@@ -201,6 +201,95 @@ against the real Pages canvas at 320/360/400**, the same integration boundary T0
 already required for the handshake itself. Flagged as an escalation, not silently
 folded into "done" (rule `88`).
 
+## T015 — `usePageScan`, and the context export it needed
+
+`lib/scan/usePageScan.ts` subscribes once (`client.query('pages.context', { subscribe:
+true, onSuccess })`) and handles BOTH the promise's initial `data` (first snapshot) and
+every later `onSuccess` payload through the same `runScan` path, since the client.d.ts
+usage examples treat the resolved `data` as the current value and `onSuccess` as the
+update channel — treating only one of the two risks missing the first page. Every
+payload resets `scan` to `null` and `status` to `'loading'` synchronously (FR-4/AC-1.3)
+before anything async runs; a `scanIdRef` guards a slow HTML fetch resolving after a
+newer selection already superseded it.
+
+**Language:** `pageInfo.language ?? siteInfo.language`, never `'en'`. When neither is
+present the scan cannot proceed (both `pagesGetPageHtml` and `getLivePageState` require
+it) — modeled as `health.pageHtml = false` + the error state, not a distinct
+"could-not-check" scan status, since there is no PageScan without a language to fetch
+with. Documented as a deliberate reading of the ambiguous test-spec wording ("surfaces
+the could-not-check health flag") — the only health flag TR-2 owns is `pageHtml`.
+
+**Test injectability:** `ClientSDKContext` (`components/providers/marketplace.tsx`) was
+changed from module-private to `export`ed so a hook test can wrap `renderHook` with a
+stub client directly, without also standing up `MarketplaceProvider`'s handshake +
+`application.context` fetch (which the stub can't answer). One-line, additive, does not
+change T005's behaviour.
+
+## T016 — `fetchPageHtml`
+
+`lib/sdk/pagesGetPageHtml.ts` — the one typed wrapper for this call (§ 4c-5 boundary: no
+component calls `client.query` directly). Double unwrap per § 4c-6 #3 and the `.d.ts`
+cited inline. A generic `try/catch` around the whole call is correct here (unlike
+T030's `getLivePageState`, where a 404 is data): `pagesGetPageHtml` has no declared
+"the failure IS the answer" status — any rejection or shape mismatch is `{ ok: false }`,
+which the hook turns into `health.pageHtml = false` + the error state. Never a silent
+blank pass.
+
+## T017 — `extractAnchors` and the full `LinkFinding`/`PageScan` types
+
+`lib/model/types.ts` defines the full data model now (per the task's own instruction),
+with `scope`/`origin` as optional (absent until TR-3/TR-5 classify) rather than adding a
+sentinel literal to their unions — keeps the § 4c-6 literal unions exactly as specified.
+`statuses` starts as an empty `Set`, `attribution`/`targetLabel` start `null`.
+
+`lib/scan/extractAnchors.ts` uses `DOMParser` (never navigates to or requests the page —
+the string from T016 is the only input). `getAttribute('href')` is read, not the `.href`
+DOM property (which resolves to an absolute URL and would silently launder the exact
+"relative vs absolute" distinction TR-3's `classifyScope` needs). `href === null` (the
+attribute genuinely absent) becomes the literal `'(no href)'`; an empty string `href=""`
+is preserved verbatim and is NOT the same case (AC-5.3's identity vs TR-3's `malformed`
+check on an empty value are two different findings on two different inputs). Verified
+against the real captured Zephira Home fixture: 59 `<a>` elements, 57 with an `href`
+attribute + 2 without (`data-aqband` diagram nodes with no `href` at all) — both
+no-href anchors extract cleanly as their own rows.
+
+## T018 — `RawAnchorList` and the route wiring
+
+`components/panel/RawAnchorList.tsx` reuses the T011-ported `.lhl-rows`/`.lhl-row`/
+`.lhl-text`/`.lhl-href` classes with no chips/detail/origin markup — those anatomy
+pieces land at TR-6 (T044) once TR-3..TR-5 have something to show in them. `app/
+pages-context/page.tsx` now branches on `usePageScan()`'s `status`
+(`loading`→`LoadingState`, `error`→`ErrorState`, empty→`EmptyState`, else the raw list
+inside `PanelShell`). The verdict line (`"N links found"`) is explicitly provisional,
+commented as such — T042 owns the real verdict-sentence contract once statuses exist.
+
+## T019 — M2 reconciliation harness
+
+`lib/scan/reconcileAnchors.ts` pairs two `{ href, ordinal }` lists by that composite key
+(the row identity) and reports unmatched rows on **both** sides — a count match alone is
+not accepted as a reconciliation. Its own test suite includes the M4-discipline control
+(a deliberately-mismatched fixture that must be caught) plus a live case against the
+real captured Zephira Home fixture: `extractAnchors`'s output vs. a bare
+`querySelectorAll('a')` re-implemented at the test call site (not imported from
+`extractAnchors` — a genuinely separate query path over the same parsed document).
+100% pairwise match, 59/59.
+
+**What this does NOT satisfy:** T019's full contract is against an independent query
+executed in the **live Pages canvas**, not a second parse of the same capture string —
+that needs `marketplace-sdk-host-frame-testing` against a real, authenticated host
+session, which this pass has no access to. Recorded as an outstanding operator step in
+`project-planning/captures/m2-reconciliation-20260901T130000Z.md`, same treatment as
+T014's outstanding pixel-compare leg — not silently folded into "done" (rule 88).
+
+## T020 — TR-2 tests and pixel compare
+
+37/37 unit tests green (`npm run test`), `tsc --noEmit` clean, `npm run lint` at the
+TR-1 baseline (2 pre-existing warnings in vendored `empty-states.tsx`/`error-states.tsx`,
+0 new), `npm run build` clean. `node verify-poc.mjs` exits 0 against the POC folder,
+unmodified. **Pixel capture-and-compare against the real host is an outstanding operator
+step**, same as T014 — Mode A has no mock-client path, so no route can be screenshotted
+outside a real, authenticated Cloud Portal session.
+
 ## T005 — root `/` route behaviour
 
 Root `/` was left as the scaffold's demo page (`application.context` + `listLanguages` examples), not
