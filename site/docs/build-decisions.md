@@ -290,6 +290,97 @@ unmodified. **Pixel capture-and-compare against the real host is an outstanding 
 step**, same as T014 — Mode A has no mock-client path, so no route can be screenshotted
 outside a real, authenticated Cloud Portal session.
 
+## TR-3 — T021 dropped, T022 rebuilt on href shape (Addendum, 2026-09-01)
+
+Per the T0 probe's Addendum: `xmc.agent.sitesGetSitesList` returns 7 sites, **0 of 7
+carrying a `targetHostname`** — the host list T021 was written to fetch is unusable for
+scope classification. **T021 is not implemented as written; no `sitesGetSitesList` call
+is made anywhere in TR-3.** `PageScan.health.hosts` stays permanently `true` (it is
+never set false because nothing fetches it) — kept in the type rather than removed, since
+TR-4/ADR-0009 territory (media-path exclusion, path-by-url replacement) may still want a
+`health` slot for the resolution source it introduces; repurposing an unused field costs
+less than churning the `PageScan` shape twice in one build.
+
+`lib/scan/classifyScope.ts` (T022) classifies by href **shape** instead: a leading
+`//` or `scheme:` (case-insensitive) is external; `mailto:`/`tel:`/`javascript:` are
+non-navigational; everything else (relative path, query-only, fragment-only) is
+internal. Verified against the real captured Zephira Home page: all 56 relative hrefs
++ the one `#content` anchor classify internal, 0 absolute present on that page. The
+accepted false-negative this creates — an absolute URL pointing back at the site's own
+host would misclassify as external — is explicitly accepted per the run brief: external
+links are only ever listed with the standing `reachability-not-checked` note, never
+claimed checked, so the misclassification costs a slightly wider External group, not a
+wrong verdict.
+
+## T023 — the two string checks
+
+`lib/scan/stringChecks.ts`. `isInsecureScheme` is a bare `/^http:\/\//i` test on the
+trimmed href — no scope branch anywhere in the function, which is what the T023
+REGRESSION test (`http://` flagged on an external-shaped href) actually exercises: the
+function has no `scope` parameter to short-circuit on. `isMalformed` exempts both a bare
+`#` (AC-5.2) **and** the `'(no href)'` sentinel extraction assigns to a missing `href`
+attribute — the run brief calls these the same idiom (a JS-hooked control with no real
+destination), and flagging either would make a menu-bearing known-good control page
+unreachable for M4. `NO_HREF` is now exported from `extractAnchors.ts` so the two files
+can't drift on the literal.
+
+## T024 — the standing `reachability-not-checked` member
+
+`lib/scan/reachabilityNote.ts` is a one-line `Set.add`, deliberately not folded into
+`classifyScope` — attaching a status is TR-3's classification concern, not the scope
+axis's. Status labels/detail copy for the members TR-3 introduces now live in
+`lib/panel/copy.ts` as `STATUS_LABEL`/`STATUS_DETAIL` (this project's established home
+for verbatim UI strings, alongside `SCOPE_STATEMENT` etc. — not the `src/lib/model/`
+location § 4c-5 names, since this project has no `src/` prefix and `lib/panel/copy.ts`
+was already the convention TR-1 set). TR-4/5 amend the same two objects as their status
+members land.
+
+## T025 — in-page anchor check
+
+`lib/scan/anchorCheck.ts`. Probe (a) is CONFIRMED
+(`project-planning/plans/probe-findings-t008-20260901T090000Z.md`), so this task
+proceeds rather than the AC-6.4 withdrawal. Only a pure-fragment href (`/^#(.+)$/`) is
+evaluated — a bare `#` has no capture group content and is correctly ignored, and a
+fragment on a different page's href (`/other#x`) never matches the pattern at all, which
+is what gives AC-6.3 for free rather than needing a separate "same page" guard. Checked
+via `getElementById` first, then a `[name]` scan (not a CSS-escaped `querySelector`,
+which would need to handle arbitrary fragment-name characters safely). Verified against
+the real captured Zephira Home page: `#content` resolves against its own `id="content"`.
+
+## T026 — status-set model, precedence, headline
+
+`lib/model/precedence.ts`. `PRECEDENCE` deliberately omits `reachability-not-checked` —
+absence from the array is what makes `headlineOf`'s `for`-loop fall through to the `ok`
+default when it's the only member present, rather than needing a second exclusion check.
+`headlineOf` never mutates or reads back into the passed `Set`; precedence is read-only
+selection over it, so "every member stays visible" (ADR-0005) is true by construction —
+there is nothing in this module that could remove one.
+
+## TR-3 wiring — `classifyFindings`
+
+`lib/scan/classifyFindings.ts` composes all four TR-3 checks over a scan's findings and
+is the one seam `usePageScan.ts` calls after `extractAnchors` — the five pure functions
+above are each independently unit-tested, but none of them fires against a real scan
+without this file (memory: "test the wiring, not just the pure function";
+`classifyFindings.test.ts` is that wiring test). It builds a **new** `Set` per finding
+rather than mutating `finding.statuses` in place, so callers holding a reference to the
+seed array (e.g. a test fixture) never see it change out from under them.
+
+## T027 — TR-3 tests, M5 word-ban gate
+
+`lib/model/wordBan.test.ts` sweeps every exported string in `lib/panel/copy.ts`,
+including the nested `STATUS_LABEL`/`STATUS_DETAIL` lookup objects, not just top-level
+string constants — a flat `Object.values` typeof-string filter would silently skip both
+objects and report clean on an empty search space (rule 88's exact shape). The control
+assertion plants `broken`/`unreachable`/`404`/`dead` against the same regex and asserts
+it fires, proving the detector can fail.
+
+**Pixel compare against `group-insecure-open.html`/`group-malformed-open.html` is NOT
+run in this pass** — batched to one operator-driven pass at the TR-6 build gate per the
+run brief; TR-3 ships no row/group UI (that's TR-6's T041–T044), so there is nothing yet
+for those two frames to compare against. `node verify-poc.mjs` re-run and still exits 0,
+unmodified.
+
 ## T005 — root `/` route behaviour
 
 Root `/` was left as the scaffold's demo page (`application.context` + `listLanguages` examples), not
