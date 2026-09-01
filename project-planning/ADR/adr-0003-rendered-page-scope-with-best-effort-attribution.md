@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — **the fallback-label clause is narrowed by ADR-0006** (see Amendment below). The scope
+Accepted — **the fallback-label clause is narrowed by ADR-0006, and the jump-action clause by ADR-0010** (see Amendment below). The scope
 decision, the best-effort posture, the accepted duplicate reporting and the rejected
 full-attribution option all stand unchanged.
 
@@ -74,3 +74,17 @@ attribution are all untouched.
 ## Date
 
 2026-08-31
+
+## Amendment (2026-09-01, T0 probe (g) → ADR-0010)
+
+The Decision says an attributed link "carries a jump action". **The probe refuted field-level
+selection at runtime** — the client exposes exactly `["pages.reloadCanvas", "pages.context"]` for
+mutation, `getValue` is not implemented, and `PagesContextParams` is `{ itemId?, language?,
+itemVersion? }`. Item-level navigation works; selecting a *field* does not exist.
+
+**ADR-0010 changes the affordance's shape:** name the owning rendering/datasource (from
+`pages.context`'s `presentationDetails`) and navigate to that **item**, labelled for what it does.
+
+**What is unchanged, and is the reason this is a narrowing rather than a reversal:** the principle
+that a control must never promise a resolution it cannot deliver. That is what produced the chrome
+label here, and it is what forbids labelling item navigation as a field jump.
