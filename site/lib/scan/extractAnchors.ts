@@ -4,7 +4,10 @@
 // LinkFinding per <a> in document order; classification fields land in TR-3..5.
 import type { LinkFinding } from "@/lib/model/types";
 
-const NO_HREF = "(no href)";
+// Exported so downstream checks (T023's malformed check) can exempt this
+// sentinel the same way they exempt a bare '#' — a fixed string that two
+// files would otherwise have to agree on independently.
+export const NO_HREF = "(no href)";
 
 export function extractAnchors(html: string): LinkFinding[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
