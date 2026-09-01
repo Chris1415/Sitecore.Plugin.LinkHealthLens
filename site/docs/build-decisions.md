@@ -41,6 +41,13 @@ operator's to read off the captured blob, not this harness's to conclude.
 **Throwaway, per T006's own contract — deleted at T008 close** (`app/probe/`, `lib/probe/`, and the
 link out of `/pages-context`). Its removal at that point is not a regression.
 
+**Code-review correction (TR-1 review):** the deletion above did not actually happen at T008 — both
+directories and a `Dev: open probe harness` link out of the production `/pages-context` route survived
+into the TR-1 diff, so the throwaway CM-reading harness was reachable from the one registered extension
+point. Removed for real at TR-1 code review: `app/probe/`, `lib/probe/`, and the link. This paragraph is
+left in place, corrected, rather than rewritten, so the gap between the claim and the disk state stays
+visible (rule 88 — a status claim in prose is not a gate).
+
 ## T009 — Blok primitive inventory
 
 Quickstart shipped `alert, badge, button, card, collapsible, separator, skeleton`

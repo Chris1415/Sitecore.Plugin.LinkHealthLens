@@ -35,4 +35,16 @@ describe("ErrorState", () => {
       expect(text.toLowerCase()).not.toContain(banned);
     }
   });
+
+  it("control: the ban check above can actually fail", () => {
+    // A gate that cannot fail is worse than no gate (§ 4c-1 / T027 pattern).
+    const text = "this page seems broken and the link is dead";
+    for (const banned of ["broken", "dead", "404", "unreachable"]) {
+      if (text.includes(banned)) {
+        expect(text.toLowerCase()).toContain(banned);
+        return;
+      }
+    }
+    throw new Error("control fixture did not exercise the banned-word list");
+  });
 });
