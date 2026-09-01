@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T13:45:00Z",
+  "updated_at": "2026-09-01T13:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "TR-3 — host list + scope + string checks (T021-T027).",
+  "next_action": "TR-4 (two-call internal resolution). ALSO: the known-bad smoke page does not trip any TR-3 check — decide how to get a page that genuinely exercises the checks before TR-6's smoke.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -422,6 +422,17 @@
       "findings": "0 Critical, 0 Major, 0 Minor — no code changes needed",
       "orchestrator_verification": "A zero-finding review is itself a claim, so the two load-bearing ones were checked by EXECUTION. (1) Double unwrap: mutating pagesGetPageHtml.ts to a single unwrap makes 2 tests FAIL, including one named for the regression; restoring returns 37/37. (2) Independent DOM query: reconcileAnchors.test.ts builds its own list with querySelectorAll + getAttribute, separate from extractAnchors.ts — genuinely independent, not the extractor compared to itself.",
       "orchestrator_error_recorded": "My FIRST mutation attempt silently did not apply — a bash-style path was passed to Python, which could not open it — and the suite then printed 37/37. That green result proved nothing. This is the Gate-3 trap verbatim: a mutation that fails to apply is indistinguishable from a mutant that survives, and both render as a green run. The second attempt ASSERTED the file changed before running anything."
+    },
+    "TR-3-exit": {
+      "outcome": "pass",
+      "verified_independently": "87/87 tests (18 files) · lint 0 errors · verify-poc 35/35 · comment-density exit 0 · classifyFindings genuinely CALLED from usePageScan.ts:84 (not an orphan, rule 88) · bare '#' exempt at stringChecks.ts:12 per the operator decision"
+    },
+    "M4-early-probe": {
+      "outcome": "vacuous — both pages clean",
+      "control_koven": "7 anchors, 0 findings",
+      "known_bad_zephira": "59 anchors, 0 findings",
+      "diagnosis": "NOT a defect. TR-3's four checks are arithmetically correct on this page: no href carries an http: scheme (all 56 are relative), the only malformed candidates are a bare '#' and 2 no-href anchors which are exempt by operator decision, reachability-not-checked applies only to external rows and there are zero absolute links, and #content resolves. The page simply does not exercise the checks.",
+      "consequence": "The smoke plan currently proves nothing. Control-clean and known-bad-clean are the same result; the control only carries meaning once the known-bad page produces findings. This was flagged as a RISK when the pages were picked (Zephira's documented defects are route-path divergences on the LIVE surface, while this app checks CM-side state) and is now MEASURED rather than suspected."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -737,6 +748,13 @@
       "type": "assumption",
       "severity": "info",
       "item": "TR-2 modelled 'no language available' as health.pageHtml=false rather than a distinct scan-level status, because the data model has no such member. It is a reading of the contract, not an invention, and the Developer flagged it rather than deciding silently. QA can rename it at /test if a distinct status is wanted.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "decision",
+      "severity": "warn",
+      "item": "The known-bad smoke page does not trip any TR-3 check — measured, 0 findings on 59 anchors, and the arithmetic says that is correct rather than broken. So M4's control currently passes trivially and the smoke proves nothing. Three ways forward: (a) wait for TR-4, whose internal-existence and publish-state checks may fire on Zephira where the string checks cannot; (b) author a deliberate test page carrying a genuinely bad link set — one http:// link, one empty href, one #missing anchor, one link to a deleted page — which is a REAL-TENANT WRITE and needs your consent even though gates.go_live is off; (c) accept unit-fixture coverage only and drop the live known-bad page, recording that the end-to-end smoke is fixture-based. Recommendation: (a) first, since it costs nothing and TR-4 is next, then (b) only if TR-4 also comes back empty.",
       "status": "open"
     }
   ],
