@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T08:40:00Z",
+  "updated_at": "2026-09-01T06:21:59.813Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -331,10 +331,10 @@
     "branch_name": "prd-000",
     "git_remote": "create",
     "remote_url": "https://github.com/Chris1415/Sitecore.Plugin.LinkHealthLens.git",
-    "status": "not_started",
+    "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "run /implement scoped to TR-0 — the blocking probe tranche, runs first and alone",
+  "next_action": "TR-0 partially complete (T001-T005 of 8). BLOCKED on T006-T008 — need an authenticated Cloud Portal browser session to drive the real Pages canvas. Resume /implement with browser/portal-automation access, or have the operator perform the manual portal walkthrough and hand back captured responses.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -550,6 +550,13 @@
       "type": "assumption",
       "severity": "warn",
       "item": "Zephira's documented defects (rule 85) are ROUTE-PATH divergences observed on the LIVE surface. This app checks CM-side state via path-by-url + getLivePageState, so those specific defects may be invisible to it. If T0/TR-3 finds nothing on the known-bad page, that is not evidence the checker works — fall back to Velaro Home for anchor volume and find a genuine CM-side defect.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] T005-T008 require driving an authenticated Cloud Portal Pages-canvas session (frame the app, select a page, capture pages.context/subscription payloads and the five SDK surfaces' real responses). No browser/portal-automation tool was available to the Developer subagent this pass. T001-T004 completed and committed (preflight, scaffold, LNA headers, Vitest stack); T005's route file exists and typechecks/lints clean but its portal handshake is UNVERIFIED. T006 (probe harness), T007 (probe capture) and T008 (verdicts) did not run. Needs either: (a) the operator runs the manual portal steps (load http://localhost:3000/pages-context inside the real Pages canvas on devex, confirm application.context resolves, then walk the seven probe questions) and reports results back, or (b) a browser-automation tool granted to a resumed implementation session.",
       "status": "open"
     }
   ],
