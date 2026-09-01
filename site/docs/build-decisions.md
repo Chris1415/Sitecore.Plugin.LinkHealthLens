@@ -532,3 +532,41 @@ are wired into `usePageScan` and fire on every scan (console only, NFR-3), but n
 a real page's HTML with its `presentationDetails`, so no real M3 rate has been measured in this pass —
 same "outstanding operator step" treatment as M1/M2/M4 in TR-1 through TR-4 (Mode A has no mock-client
 path). Given T036's conservative refusal rule, expect the real-tenant number to be LOW until re-measured.
+
+**T041 — the depth bug, the fixture pair, and the measured real number.** The operator captured a real
+paired fixture (`project-planning/captures/agent-page-html-velaro-home.DEVREL.json` +
+`velaro-home-presentation-details.DEVREL.json`, Velaro Home / DEVREL, 2026-09-01) and the first real
+measurement against it was **0/10 (0%)** — well under A3's 50%. Root cause: `attribute()` correlated
+`main.children` against `presentationDetails`, but this head app wraps its body renderings in a single
+shell element — `<main id="main"><div id="content">...5 sections...</div></main>` — so `main.children`
+was 1 against 5 real renderings, and the refusal rule (correctly) fired on every anchor. The
+one-level-deeper node (`#content`) has exactly 5 `<section>` children against 5 `presentationDetails`
+entries — an exact match.
+
+Fix (`findCorrelationRoot`, `attribute.ts`): descend from `<main>` while a node has **exactly one
+element child**, checking the child count against the rendering count at each level, and refuse
+(`null`) if no level in a **bounded** descent (3 levels) matches. Bounded on purpose: a page-shell
+wrapper is definitionally single-child, so descending through one is safe; an unbounded walk could in
+principle wander INSIDE one individual rendering's own markup (a component that happens to render a
+single wrapper element around a count-matching set of children) and land on a coincidental match — which
+would silently mis-attribute an anchor to the wrong rendering, the exact class of guess the refusal rule
+exists to prevent. Three levels covers this head app's one-level shell wrap plus headroom without
+reaching into rendering-internal markup. **No tag name or id (`#content`) is hard-coded** — the rule is
+purely structural (single-child-then-count-match), verified against the fixture without special-casing
+its markup.
+
+A second, independent bug found via the same fixture: `pageInfo.presentationDetails` on this tenant
+parses to `{ devices: [{ renderings: [...] }] }`, not the flat array T036 assumed from probe (d)'s
+prose description. `parsePresentationDetails` now accepts both shapes (flat array unchanged for
+`attribute.test.ts`'s synthetic fixtures; unwraps `devices[].renderings` for the real shape) — without
+this the fixture never reaches `findCorrelationRoot` at all, since `parsePresentationDetails` returned
+`null` on the wrapped shape before either bug's fix.
+
+**Measured after both fixes** (`attributionRate.real.test.ts`, real pipeline: `extractAnchors` ->
+`classifyFindings` -> `computeAttributionRate`, not the unit alone): **M3 = 10/10 (100%)** — every
+structurally-content anchor on this page correlates to a rendering. Origin split sanity-checked against
+the same fixture: **chrome 7 / content 10** (sums to the page's 17 anchors), consistent with 7
+header+nav+footer links and matching the escalation's own manual tally — no origin-split defect found.
+This is one page on one tenant; T033/T034's "table over >=5 named pages" real-tenant step is still
+outstanding (unchanged from T032's note above) and M3 should be re-measured there before treating 100%
+as representative.
