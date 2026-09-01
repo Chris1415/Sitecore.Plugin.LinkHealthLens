@@ -5,7 +5,7 @@
 // loading, fetch the page HTML, extract anchors. Unsubscribes on unmount.
 import type { PagesContext } from "@sitecore-marketplace-sdk/client";
 import { useEffect, useRef, useState } from "react";
-import { useMarketplaceClient } from "@/components/providers/marketplace";
+import { useAppContext, useMarketplaceClient } from "@/components/providers/marketplace";
 import { extractAnchors } from "@/lib/scan/extractAnchors";
 import { classifyFindings } from "@/lib/scan/classifyFindings";
 import { fetchPageHtml } from "@/lib/sdk/pagesGetPageHtml";
@@ -32,6 +32,11 @@ function pagePartsOf(ctx: PagesContext) {
 
 export function usePageScan(): UsePageScanResult {
   const client = useMarketplaceClient();
+  const appContext = useAppContext();
+  // TR-4 fix: `.preview`, not `.live` — this panel reads the page as it
+  // currently is in the editor, which may be unpublished; `.live` would fail
+  // or return stale markup for an unpublished page (docs/build-decisions.md).
+  const contextId = appContext.resourceAccess?.[0]?.context?.preview;
   const [status, setStatus] = useState<ScanStatus>("loading");
   const [scan, setScan] = useState<PageScan | null>(null);
   // Guards a slow HTML fetch resolving after a newer selection already reset
@@ -64,7 +69,11 @@ export function usePageScan(): UsePageScanResult {
         return;
       }
 
-      const result = await fetchPageHtml(client, { pageId: page.id, language: page.language });
+      const result = await fetchPageHtml(client, {
+        pageId: page.id,
+        language: page.language,
+        contextId,
+      });
       if (cancelled || thisScanId !== scanIdRef.current) return;
 
       if (!result.ok) {
@@ -110,7 +119,7 @@ export function usePageScan(): UsePageScanResult {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [client]);
+  }, [client, contextId]);
 
   return { status, scan };
 }

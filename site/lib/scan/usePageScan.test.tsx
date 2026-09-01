@@ -1,16 +1,32 @@
 // T015 — pages.context subscription + per-selection scan. RED before GREEN.
-import type { PagesContext } from "@sitecore-marketplace-sdk/client";
+// TR-4 addendum: sitecoreContextId now comes from AppContextContext
+// (resourceAccess[0].context.preview) — every wrapper below supplies a stub
+// appContext so the pre-existing tests don't regress under the new read.
+import type { ApplicationContext, PagesContext } from "@sitecore-marketplace-sdk/client";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { ClientSDKContext } from "@/components/providers/marketplace";
+import { AppContextContext, ClientSDKContext } from "@/components/providers/marketplace";
 import { createStubClient } from "@/test/client-stub";
 import { usePageScan } from "./usePageScan";
 
-function wrapperFor(stubClient: ReturnType<typeof createStubClient>["stubClient"]) {
+const STUB_APP_CONTEXT: ApplicationContext = {
+  id: "app-1",
+  url: "https://example.test",
+  resourceAccess: [
+    { context: { live: "ctx-live-1", preview: "ctx-preview-1" } },
+  ],
+};
+
+function wrapperFor(
+  stubClient: ReturnType<typeof createStubClient>["stubClient"],
+  appContext: ApplicationContext | null = STUB_APP_CONTEXT,
+) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ClientSDKContext.Provider value={stubClient}>{children}</ClientSDKContext.Provider>
+      <ClientSDKContext.Provider value={stubClient}>
+        <AppContextContext.Provider value={appContext}>{children}</AppContextContext.Provider>
+      </ClientSDKContext.Provider>
     );
   };
 }
@@ -87,6 +103,56 @@ describe("usePageScan", () => {
     expect(result.current.scan?.page.language).not.toBe("en");
     // No HTML fetch was attempted — you cannot ask pagesGetPageHtml a required
     // param it doesn't have.
+    expect(query).not.toHaveBeenCalledWith(
+      "xmc.agent.pagesGetPageHtml",
+      expect.anything(),
+    );
+  });
+
+  it("passes sitecoreContextId (.context.preview) through to pagesGetPageHtml", async () => {
+    const { stubClient, query } = createStubClient();
+    let onSuccess: ((ctx: PagesContext) => void) | undefined;
+    query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
+      onSuccess = opts?.onSuccess;
+      return Promise.resolve({ data: undefined, unsubscribe: vi.fn() });
+    }) as never);
+
+    const { result } = renderHook(() => usePageScan(), { wrapper: wrapperFor(stubClient) });
+    await waitFor(() => expect(onSuccess).toBeDefined());
+
+    query.mockResolvedValueOnce({
+      data: { data: { pageId: "page-1", html: '<a href="/a">A</a>' } },
+    } as never);
+    onSuccess?.(READY_CTX);
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(query).toHaveBeenCalledWith(
+      "xmc.agent.pagesGetPageHtml",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          query: expect.objectContaining({ sitecoreContextId: "ctx-preview-1" }),
+        }),
+      }),
+    );
+  });
+
+  it("goes to the error state (never a silent pass, never a cast) when no context id is available", async () => {
+    const { stubClient, query } = createStubClient();
+    let onSuccess: ((ctx: PagesContext) => void) | undefined;
+    query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
+      onSuccess = opts?.onSuccess;
+      return Promise.resolve({ data: undefined, unsubscribe: vi.fn() });
+    }) as never);
+
+    const noContext: ApplicationContext = { id: "app-1", url: "https://example.test", resourceAccess: [] };
+    const { result } = renderHook(() => usePageScan(), { wrapper: wrapperFor(stubClient, noContext) });
+    await waitFor(() => expect(onSuccess).toBeDefined());
+
+    onSuccess?.(READY_CTX);
+
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.scan?.health.pageHtml).toBe(false);
+    // The failure is reported (no-context), never a call with sitecoreContextId=undefined on the wire.
     expect(query).not.toHaveBeenCalledWith(
       "xmc.agent.pagesGetPageHtml",
       expect.anything(),

@@ -381,6 +381,31 @@ run brief; TR-3 ships no row/group UI (that's TR-6's T041–T044), so there is n
 for those two frames to compare against. `node verify-poc.mjs` re-run and still exits 0,
 unmodified.
 
+## TR-4 defect fix — `fetchPageHtml` was missing `sitecoreContextId`
+
+Found at first real contact in the live Cloud Portal Pages canvas: the panel rendered
+correctly (shell, styles, breadcrumb, states, copy all fine) but always showed the error
+state. Cause: `xmc.agent.pagesGetPageHtml` was called with no `sitecoreContextId` —
+`marketplace-sdk-xmc` § 6a is explicit that almost every XMC endpoint needs it in Mode A,
+and the out-of-band CM-bearer-token testing that passed earlier had tenant scope the
+portal-brokered path doesn't carry.
+
+`fetchPageHtml` now takes `contextId: string | undefined` and guards it — never an
+`as string` cast (§ 6a names that cast as the anti-pattern: it ships
+`sitecoreContextId=undefined` on the wire and hides the cause at compile time). Absent
+context is now its own `{ ok: false, reason: "no-context" }`, distinct from
+`"request-failed"` (the call threw) and `"bad-envelope"` (double-unwrap yielded no
+`html`) — previously all three collapsed into one indistinguishable `{ ok: false }`,
+which is the exact rule-88 shape: a failure reported with no way to tell what failed.
+Each cause is also `console.error`'d once (no token/credential in the logged shape).
+
+`usePageScan` sources the id from `useAppContext().resourceAccess?.[0]?.context?.preview`
+— `.preview`, not `.live`: this panel reads the page as currently edited, which may be
+unpublished, and `.live` would fail or return stale markup for an unpublished page.
+`AppContextContext` (`components/providers/marketplace.tsx`) is now exported for the same
+reason `ClientSDKContext` was at T015 — a hook test needs to supply a stub without
+standing up the whole handshake.
+
 ## T005 — root `/` route behaviour
 
 Root `/` was left as the scaffold's demo page (`application.context` + `listLanguages` examples), not

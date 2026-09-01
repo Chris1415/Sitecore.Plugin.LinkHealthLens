@@ -20,9 +20,11 @@ interface ClientSDKProviderProps {
 
 // Exported (not just the hooks) so TR-2 tests can wrap a hook under test with
 // a stub client directly, without standing up the whole handshake+appContext
-// flow this provider owns (T015).
+// flow this provider owns (T015). AppContextContext exported too (TR-4) —
+// usePageScan now reads sitecoreContextId off it and its own tests need to
+// supply a stub appContext the same way.
 export const ClientSDKContext = createContext<ClientSDK | null>(null);
-const AppContextContext = createContext<ApplicationContext | null>(null);
+export const AppContextContext = createContext<ApplicationContext | null>(null);
 
 export const MarketplaceProvider: React.FC<ClientSDKProviderProps> = ({
   children,
