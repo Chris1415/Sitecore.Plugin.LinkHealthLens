@@ -1,0 +1,5 @@
+// captured: devex tenant developerex211b-hahnsolo3097-cm7744 on 2026-09-01 via edge-platform ai-agent-api
+// credential: SITECORE_CM_CLIENT_ID_DEVEX (token tenant claim asserted)
+// GET https://edge-platform.sitecorecloud.io/stream/ai-agent-api/api/v1/pages/d3c70fca-4db4-4cbc-aa67-e3dbc2916aaa/live?language=en
+// HTTP 404
+{"type":"https://datatracker.ietf.org/doc/html/rfc7231#section-6.5","detail":"Not Found"}
