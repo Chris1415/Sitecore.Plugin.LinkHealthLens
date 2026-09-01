@@ -41,6 +41,159 @@ operator's to read off the captured blob, not this harness's to conclude.
 **Throwaway, per T006's own contract — deleted at T008 close** (`app/probe/`, `lib/probe/`, and the
 link out of `/pages-context`). Its removal at that point is not a regression.
 
+## T009 — Blok primitive inventory
+
+Quickstart shipped `alert, badge, button, card, collapsible, separator, skeleton`
+(matches `blok-components` skill's captured baseline). Added the three OQ-B primitives
+via the full-URL registry form (`components.json`'s `registries` was empty, so
+`@blok/<name>` failed with "Unknown registry" — used
+`npx shadcn@latest add https://blok.sitecore.com/r/<name>.json --yes` instead, which
+resolved and wrote `components/ui/{scroll-area,empty-states,error-states}.tsx`):
+`scroll-area`, `empty-states`, `error-states`. `lucide-react@1.38.0` was already a
+scaffold dependency; all 18 POC glyph slugs verified present under
+`node_modules/lucide-react/dist/esm/icons/`.
+
+**`empty-states`/`error-states` are installed but NOT used verbatim.** Both are
+opinionated Blok blocks with their own hosted-CDN illustration, generic titles
+("Something went wrong" / "No search results") and "(Customizable text)" placeholder
+copy — a different contract from T013's exact, ADR-mandated strings and the POC's
+exact `.lhl-state` geometry (T011). `LoadingState`/`ErrorState`/`EmptyState`
+(`components/panel/`) are bespoke, built from the ported `.lhl-*` classes +
+`lucide-react` glyphs + plain markup, per T011's mandate that only the CSS geometry is
+ported and "the build is React + Blok primitives" for interactive controls. Installed
+per OQ-B's instruction to inventory them regardless; kept on disk as inventory (T009's
+own Expected Output), not wired into the panel.
+
+## T010 — measured Blok semantic token values
+
+Read directly from the scaffold's real `app/globals.css` (`:root` / `.dark`), not
+transcribed from the POC's shadcn-stock shim. Computed via WCAG relative-luminance
+contrast (`(L1+0.05)/(L2+0.05)`), alpha-channel tokens (`blackAlpha-*`/`whiteAlpha-*`)
+composited over the paired background first.
+
+| Pairing | Light | Dark | Verdict |
+|---|---|---|---|
+| `destructive` on `background` | 4.88:1 | 10.34:1 | **PASS AA both** — unlike the POC's stock shadcn shim (3.76:1, fails) |
+| `muted-foreground` on `muted` | 4.69:1 | 8.12:1 | **PASS AA both** — unlike the POC's stock shim (4.40:1, fails) |
+| `muted-foreground` on `background` | 4.74:1 | 7.60:1 | PASS AA |
+| `ring` on `background` (3:1 UI floor) | 3.26:1 | 4.52:1 | PASS both |
+| `foreground` on `background` | 19.17:1 | 14.74:1 | PASS |
+| `warning` on `background` | 4.89:1 | 10.39:1 | PASS AA both |
+| `primary-foreground` on `primary` | **1.48:1** | not re-measured (light already fails badly) | **FAIL — real defect** |
+
+**Blok DOES publish a `--warning` token**, contrary to the spec's OQ-A assumption (the
+POC's `--warning` was believed to be a shim with no Blok counterpart). It resolves to
+`--color-warning-500` (`#ba5200`) light / `--color-warning-200` (`#fdd291`) dark and
+passes AA in both modes, so the "check" tone (`unpublished`, `malformed`,
+`missing-anchor`) uses it directly — no `foreground`-only fallback needed.
+
+**`primary-foreground`/`primary` fails badly (1.48:1) and is a real Blok-theme defect**,
+not a POC-shim artefact — this pairing isn't used anywhere else in this app (Blok's own
+`<Button variant="default">` avoids it by using `text-inverse-text`, not
+`text-primary-foreground` — see `components/ui/button.tsx`'s `compoundVariants`). The
+one POC rule that used it (`.lhl-retry`, the error-state retry control) was ported with
+`color: var(--background)` substituted for `color: var(--primary-foreground)` —
+measured 5.50:1 light / 10.40:1 dark. Documented inline in `app/panel.css` at the
+`.lhl-retry` rule. This is a token-pairing defect worth flagging to whoever owns the
+Blok theme; out of this app's scope to fix upstream.
+
+## T011 — POC visual layer port checklist
+
+`app/panel.css` ports every non-`.poc-*` selector from
+`project-planning/design-prototypes/poc-v1-prd000/panel.css` verbatim (selector names,
+properties, values) — the POC's `:root`/`html.dark` hex **shim block is dropped
+entirely**, because every `var()` the ported rules reference (`--background`,
+`--foreground`, `--muted`, `--muted-foreground`, `--border`, `--ring`, `--primary`,
+`--primary-foreground`, `--destructive`, `--warning`) already resolves against Blok's
+real tokens declared in `app/globals.css` (T010) — no shim needed once real tokens
+exist. `--panel-w` (360px) and a local `--radius: 6px` are scoped inside `.lhl` itself
+(shadowing Blok's ambient `--radius: 0.625rem` for this subtree only), per
+`blok-theming`'s "scope CSS variable overrides to a container" guidance — geometry
+constants, not colour, so they don't route through Blok tokens.
+
+Rule-group port map (every group ported 1:1 except the one substitution above):
+shell (`.lhl`) · sticky head (`.lhl-head`, `.lhl-page`, `.lhl-verdict`,
+`.lhl-subverdict`) · count rail (`.lhl-rail`, `.lhl-count`) · scope strip
+(`.lhl-scope*`) · scroll region (`.lhl-scroll`) · group chrome (`.lhl-group*`,
+`.lhl-gsub`, `.lhl-rows`) · row anatomy (`.lhl-row`, `.lhl-text`, `.lhl-href` incl. the
+RTL start-truncation, `.lhl-chips`, `.lhl-chip`, `.lhl-detail`) · origin affordance
+(`.lhl-origin`, `.lhl-jump`, `.lhl-label`, `.lhl-jumped-note`) · states (`.lhl-state`,
+`.lhl-retry` — substituted colour only) · skeleton (`.lhl-sk*`, `@keyframes lhl-pulse`,
+`prefers-reduced-motion` block) · foot (`.lhl-foot`) · `.lhl-sr`.
+
+Deliberate omission: none besides `.poc-*` (never ported, per contract) and the one
+colour substitution above.
+
+## T012 — panel shell + theme inheritance
+
+`PanelShell` (`components/panel/PanelShell.tsx`) is the structural skeleton: the outer
+`role="region" aria-label="Link Health Lens"` div, an always-present `.lhl-head` with
+an `aria-live="polite"` verdict slot, the `.lhl-scroll` body, and an optional
+`.lhl-foot`. It takes `pageLabel`/`verdict`/`headExtra`/`children`/`foot`/`scrollProps`
+as slots so later tranches (page name at TR-2, rail/rows at TR-3–6) fill it without
+restructuring it — it owns no state and no colour of its own.
+
+`application.context` is already read once at init by `MarketplaceProvider`
+(`components/providers/marketplace.tsx`, decided at T005) and exposed via
+`useAppContext()` — FR-3 needs no second read.
+
+**Theme inheritance:** wired `ThemeProvider` (`components/theme-provider.tsx`,
+`next-themes`, `attribute="class"`, `defaultTheme="system"`) into `app/layout.tsx`
+around `MarketplaceProvider`. This was scaffolded but not yet mounted. Blok's tokens
+flip under `.dark` on `<html>` (per `blok-theming`); `system` means the iframe's own
+`prefers-color-scheme` decides, never a hardcoded mode — `PanelShell` applies no theme
+class itself (tested: T014). Left the scaffold's `ThemeHotkey` ('d' key toggle) in
+place; it only listens inside this document (the portal iframe), so it cannot fire from
+keystrokes in the parent canvas — low risk, revisit at code review if it reads as an
+unwanted keyboard trap ahead of T046.
+
+## T013 — loading / error / no-links states
+
+`components/panel/{LoadingState,ErrorState,EmptyState}.tsx`, each composing
+`PanelShell` + a shared `ScopeStrip` (`components/panel/ScopeStrip.tsx`, built early
+here since all three states need it — it is T043's own component, brought forward).
+Copy strings are exported constants in `lib/panel/copy.ts` (T009-era rule: a fixed
+string quietly diverges when duplicated inline vs. in its test).
+
+- **Loading** (`state-loading.html`): 6 skeleton rows (three bars each, POC's per-row
+  width taper) plus the `Checking links…` verdict and `No result yet — this is not a
+  clean page.` sub-line; `ScopeStrip noToggle` (statement stays, toggle suppressed —
+  AC-8.3 needs the permanence, not a disclosure against no data yet).
+- **Error** (`state-error.html`): `role="alert"` on the scroll region (not the whole
+  panel — matches the POC, keeps the always-present head out of the live region
+  storm), headline *"This page's markup did not come back"*, body framing it as *"a
+  failure of this panel, not a verdict about the page or its links"*, a `Try again`
+  button wired to an optional `onRetry` prop (no-op default — real retry lands with
+  acquisition at T016).
+- **No links** (`state-no-links.html`, AC-1.4): explicit non-blank state, `ScopeStrip`
+  WITH its toggle (this is a "ready" variant per the POC, not loading/error, so the
+  disclosure is offered normally).
+
+## T014 — TR-1 tests and pixel compare
+
+Unit/component tests (16 total, `npm run test` green): `PanelShell.test.tsx` (landmarks,
+always-present `aria-live` slot even with no verdict yet, no forced theme class, foot
+omitted vs. rendered), `LoadingState.test.tsx`, `ErrorState.test.tsx`,
+`EmptyState.test.tsx`, `ScopeStrip.test.tsx` (built ahead of T043 since three TR-1
+states depend on it).
+
+**Pixel capture-and-compare against the real host — NOT completed in this session, and
+not claimed as passed.** Mode A has no mock-client path (confirmed again here):
+`MarketplaceProvider` wraps the entire route tree at the root layout and renders
+nothing (`if (!client) return null`) until a real Cloud Portal handshake resolves, so
+*no* route — including a throwaway local-only preview page — can be screenshotted
+outside a real, authenticated host session. A throwaway `/dev-preview` route was built,
+screenshotted locally, found blank for exactly this reason, and deleted (not carried
+into the tree). What WAS verified: (1) `app/panel.css` selectors are a verbatim,
+selector-for-selector port of the POC's `.lhl-*` rules (T011's own gate); (2) each
+state component's DOM structure and class names were built directly against
+`panel.js`'s `renderLoading`/`renderError`/`renderReady`'s zero-length branch, cited
+inline per component; (3) `node verify-poc.mjs` exits 0 against the POC folder
+unmodified. **Outstanding: an operator-driven pass of `marketplace-sdk-host-frame-testing`
+against the real Pages canvas at 320/360/400**, the same integration boundary T005
+already required for the handshake itself. Flagged as an escalation, not silently
+folded into "done" (rule `88`).
+
 ## T005 — root `/` route behaviour
 
 Root `/` was left as the scaffold's demo page (`application.context` + `listLanguages` examples), not

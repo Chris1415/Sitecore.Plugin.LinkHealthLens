@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MarketplaceProvider } from "@/components/providers/marketplace";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,11 +25,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MarketplaceProvider>{children}</MarketplaceProvider>
+        {/* T012: theme is inherited from the host (system preference), never
+            forced. See components/theme-provider.tsx. */}
+        <ThemeProvider>
+          <MarketplaceProvider>{children}</MarketplaceProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,0 +1,368 @@
+/* Link Health Lens — panel visual layer (T011).
+   Ported verbatim from project-planning/design-prototypes/poc-v1-prd000/panel.css,
+   selector-for-selector, with the POC's :root/html.dark hex SHIM dropped —
+   every var() below resolves against Blok's real tokens already declared in
+   app/globals.css (--background, --foreground, --muted, --muted-foreground,
+   --border, --ring, --primary, --primary-foreground, --destructive,
+   --warning). Geometry-only locals (--panel-w, --radius) are scoped to .lhl
+   so they shadow the ambient Blok radius rather than overriding it globally
+   (blok-theming: "scope CSS variable overrides to a container"). Port
+   checklist + measured token table: docs/build-decisions.md (T010, T011). */
+
+.lhl {
+  --panel-w: 360px;
+  --radius: 6px;
+  width: var(--panel-w);
+  flex: 0 0 var(--panel-w);
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+/* --- sticky head: verdict + counts + the permanent scope statement (AC-8.3) */
+
+.lhl-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 12px 10px;
+}
+
+.lhl-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+}
+.lhl-page span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lhl-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.lhl-verdict .lhl-i { margin-top: 2px; flex: 0 0 auto; }
+.lhl-verdict.tone-act   .lhl-i { color: var(--destructive); }
+.lhl-verdict.tone-check .lhl-i { color: var(--warning); }
+.lhl-verdict.tone-clear .lhl-i { color: var(--muted-foreground); }
+
+.lhl-subverdict {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.lhl-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lhl-count {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+  text-decoration: none;
+}
+.lhl-count:hover { background: var(--muted); }
+.lhl-count:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.lhl-count b { font-weight: 700; }
+.lhl-count.tone-act   { border-color: var(--destructive); }
+.lhl-count.tone-act   .lhl-i { color: var(--destructive); }
+.lhl-count.tone-check { border-color: var(--warning); }
+.lhl-count.tone-check .lhl-i { color: var(--warning); }
+.lhl-count.tone-note  .lhl-i { color: var(--muted-foreground); }
+
+/* the standing scope statement — permanently visible, never dismissible */
+.lhl-scope {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  padding: 7px 9px;
+}
+.lhl-scope-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--foreground);
+}
+.lhl-scope-line .lhl-i { margin-top: 1px; flex: 0 0 auto; color: var(--muted-foreground); }
+.lhl-scope-toggle {
+  font: inherit;
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.lhl-scope-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.lhl-scope-body { margin-top: 7px; font-size: 11px; color: var(--foreground); }
+.lhl-scope-body dt { font-weight: 650; margin-top: 6px; }
+.lhl-scope-body dd { margin: 1px 0 0; color: var(--muted-foreground); }
+.lhl-scope-body dt:first-child { margin-top: 0; }
+
+/* --- scrollable finding list ------------------------------------------- */
+
+.lhl-scroll { overflow-y: auto; flex: 1; }
+
+.lhl-group { border-bottom: 1px solid var(--border); }
+
+.lhl-group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  background: var(--background);
+  color: var(--foreground);
+  border: 0;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+}
+.lhl-group-head:hover { background: var(--muted); }
+.lhl-group-head:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.lhl-group-head .lhl-chev { flex: 0 0 auto; color: var(--muted-foreground); transition: transform .12s; }
+.lhl-group-head[aria-expanded="true"] .lhl-chev { transform: rotate(90deg); }
+.lhl-group-head .lhl-gi { flex: 0 0 auto; }
+.lhl-group-head .lhl-gname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lhl-group-head .lhl-gcount {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.lhl-group.tone-act   .lhl-gi { color: var(--destructive); }
+.lhl-group.tone-check .lhl-gi { color: var(--warning); }
+.lhl-group.tone-note  .lhl-gi { color: var(--muted-foreground); }
+.lhl-group.tone-clear .lhl-gi { color: var(--muted-foreground); }
+
+.lhl-gsub {
+  padding: 0 12px 8px 34px;
+  margin-top: -4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.lhl-rows { list-style: none; margin: 0; padding: 0 0 4px; }
+
+/* --- a finding row: one anchor, always exactly one row (ADR-0005) ------- */
+
+.lhl-row {
+  padding: 8px 12px 9px 11px;
+  border-left: 3px solid transparent;
+  border-top: 1px solid var(--border);
+}
+.lhl-row:first-child { border-top: 0; }
+.lhl-row.tone-act   { border-left-color: var(--destructive); }
+.lhl-row.tone-check { border-left-color: var(--warning); }
+.lhl-row.tone-note  { border-left-color: var(--border); }
+.lhl-row.tone-clear { border-left-color: transparent; }
+.lhl-row.is-jumped {
+  background: var(--muted);
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.lhl-text {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lhl-text em { font-style: normal; color: var(--muted-foreground); font-weight: 400; }
+
+/* href truncates at the START so the distinguishing END stays visible (NFR-4).
+   direction:rtl moves the ellipsis to the left edge; unicode-bidi:plaintext
+   keeps the URL itself rendering left-to-right. Do NOT reimplement with JS
+   string slicing (T011). */
+.lhl-href {
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+.lhl-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+.lhl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--muted);
+  color: var(--foreground); /* NEVER muted-foreground here — fails AA on muted */
+}
+/* the headline member of the status set is outlined + tinted glyph; every
+   other member stays a flat muted chip. Precedence drives emphasis, not
+   visibility — all members render (ADR-0005). */
+.lhl-chip.is-headline { background: var(--background); border-color: currentColor; }
+.lhl-chip.is-headline.tone-act   { color: var(--destructive); }
+.lhl-chip.is-headline.tone-check { color: var(--warning); }
+.lhl-chip.is-headline.tone-note  { color: var(--foreground); border-color: var(--border); }
+.lhl-chip.is-headline.tone-clear { color: var(--muted-foreground); border-color: var(--border); background: var(--background); }
+.lhl-chip .lhl-i { flex: 0 0 auto; }
+
+.lhl-detail { margin-top: 5px; font-size: 11px; color: var(--muted-foreground); }
+
+/* --- the three-way origin affordance (ADR-0006) ------------------------ */
+
+.lhl-origin { margin-top: 7px; display: flex; align-items: flex-start; gap: 6px; }
+.lhl-origin .lhl-i { flex: 0 0 auto; margin-top: 2px; color: var(--muted-foreground); }
+
+.lhl-jump {
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+  text-decoration: none;
+  max-width: 100%;
+}
+.lhl-jump:hover { background: var(--muted); }
+.lhl-jump:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.lhl-jump .lhl-field {
+  font-weight: 400;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the two fixed strings. Plain text, no border, no hover — they must never
+   read as a disabled button. Distinguished from each other by GLYPH, not
+   colour. */
+.lhl-label { font-size: 11.5px; color: var(--muted-foreground); }
+
+.lhl-jumped-note {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* --- states ------------------------------------------------------------ */
+
+.lhl-state { padding: 24px 16px; text-align: center; }
+.lhl-state .lhl-i { color: var(--muted-foreground); }
+.lhl-state h2 { font-size: 14px; font-weight: 650; margin: 10px 0 4px; }
+.lhl-state p { font-size: 12px; color: var(--muted-foreground); margin: 0 0 4px; }
+.lhl-state .lhl-retry {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 12px;
+  padding: 5px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  /* T010 measured --primary-foreground/--primary at 1.48:1 in light mode —
+     fails AA badly. Substituted --background, measured 5.50:1 (light) /
+     10.40:1 (dark). See docs/build-decisions.md T010. */
+  color: var(--background);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.lhl-state .lhl-retry:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* skeleton — a loading panel must never read as "clean" (PRD § 11), so the
+   skeleton is paired with an explicit progress label. */
+.lhl-sk {
+  background: var(--muted);
+  border-radius: 4px;
+  height: 10px;
+  animation: lhl-pulse 1.4s ease-in-out infinite;
+}
+@keyframes lhl-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+@media (prefers-reduced-motion: reduce) {
+  .lhl-sk { animation: none; opacity: .8; }
+  .lhl-group-head .lhl-chev { transition: none; }
+}
+
+.lhl-loading-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.lhl-sk-row { padding: 10px 12px 11px 11px; border-left: 3px solid var(--muted); border-top: 1px solid var(--border); }
+.lhl-sk-row .lhl-sk + .lhl-sk { margin-top: 6px; }
+
+.lhl-foot {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  background: var(--background);
+}
+
+.lhl-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
