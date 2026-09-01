@@ -10,6 +10,37 @@ consumed entirely inside React (`/pages-context`); the singleton pattern exists 
 which this app has none of. Modules registered: `[XMC]` only — no `AI` module, this app makes no AI-skills
 calls.
 
+## T006 — probe harness route, and why it is reachable via a link, not the URL bar
+
+`/probe` (`app/probe/page.tsx` + `lib/probe/run-probes.ts`) answers OQ (d) and (g) — the two probe
+questions that need the app framed by a real, authenticated Pages canvas (Mode A has no mock-client
+path). The other five questions were already answered out-of-band (`probe-findings-t008-*.md`) and are
+not re-asked here, though `applicationContextDump` and `pagesContextQueryOnce` re-run cheaply through
+the portal bridge so a portal-brokered answer can be diffed against the out-of-band one if it differs.
+
+Reachable only via a link from `/pages-context` (the one registered extension point, ADR-0004), not by
+typing the URL — the portal iframe has no address bar, and `MarketplaceProvider` lives in the root
+layout, so a client-side navigation from the already-handshaked panel keeps the same `ClientSDK`
+instance instead of requiring a second registered route.
+
+Evidence gathered, one-shot: `application.context` verbatim (incl. `resourceAccess[]`), `pages.context`
+queried once, `(client as any).availableModules()/hasModule()` (declared `private` in `client.d.ts` but
+present at runtime — probed because the declared `QueryMap`/`MutationMap`/`SubscribeMap` keys are a
+compile-time list, not a runtime one), `client.getValue()` (the undeclared `pages.getValue` operation —
+documented for Custom Fields, captured anyway as exactly the kind of undeclared surface (g) asks
+about), and one `client.mutate('pages.context', { params: { itemId } })` re-navigating to the *current*
+item (harmless — never a different item, never `setValue`, no other tenant write).
+
+Live, timestamped: the `pages.context` subscription, plus `pages.content.fieldsUpdated` and
+`pages.content.layoutUpdated` (`SubscribeMap`) — `fieldsUpdated` carries `fields: [{ fieldId, value,
+originalValue }]` per `core/dist/shared-types.d.ts`, which is field-level information flowing *from*
+the host on edit. That is evidence about (g)'s *read* direction only; `MutationMap['pages.context']`
+still carries no field selector for the *jump* (write) direction T037 needs — the verdict is the
+operator's to read off the captured blob, not this harness's to conclude.
+
+**Throwaway, per T006's own contract — deleted at T008 close** (`app/probe/`, `lib/probe/`, and the
+link out of `/pages-context`). Its removal at that point is not a regression.
+
 ## T005 — root `/` route behaviour
 
 Root `/` was left as the scaffold's demo page (`application.context` + `listLanguages` examples), not
