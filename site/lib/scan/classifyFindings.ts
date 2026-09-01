@@ -1,14 +1,22 @@
-// TR-3 orchestrator — composes the scope + string-check + reachability-note +
-// in-page-anchor classifiers over a scan's findings. TR-4/TR-5 amend the
-// pipeline in place as resolution and origin land; this is the one seam
-// `usePageScan` calls so each pure check stays independently testable.
+// TR-3/TR-5 orchestrator — composes the scope + string-check +
+// reachability-note + in-page-anchor + structural-origin + attribution
+// classifiers over a scan's findings. TR-4's CM resolution runs separately
+// (resolveFindings.ts, after this) since it is async and network-bound; this
+// seam stays synchronous and pure so every check remains independently
+// testable and `usePageScan` has one call site per phase.
 import type { LinkFinding } from "@/lib/model/types";
 import { classifyScope } from "./classifyScope";
 import { isInsecureScheme, isMalformed } from "./stringChecks";
 import { attachReachabilityNote } from "./reachabilityNote";
 import { checkInPageAnchor } from "./anchorCheck";
+import { classifyOrigin } from "./classifyOrigin";
+import { attribute } from "./attribute";
 
-export function classifyFindings(findings: LinkFinding[], html: string): LinkFinding[] {
+export function classifyFindings(
+  findings: LinkFinding[],
+  html: string,
+  presentationDetails?: string,
+): LinkFinding[] {
   return findings.map((finding) => {
     const scope = classifyScope(finding.href);
     const statuses = new Set(finding.statuses);
@@ -18,6 +26,14 @@ export function classifyFindings(findings: LinkFinding[], html: string): LinkFin
     if (checkInPageAnchor(finding.href, html)) statuses.add("missing-anchor");
     attachReachabilityNote(scope, statuses);
 
-    return { ...finding, scope, statuses };
+    // T035: structural origin, decided from the landmark alone — computed
+    // here, BEFORE attribution runs on the next line, so an attribution
+    // failure can never reach back and change it (ADR-0006).
+    const origin = classifyOrigin(finding.ordinal, html);
+    // T036: best-effort, content-origin only — a chrome link never attempts
+    // attribution (T038 renders its fixed label unconditionally).
+    const attribution = origin === "content" ? attribute(finding.ordinal, html, presentationDetails) : null;
+
+    return { ...finding, scope, statuses, origin, attribution };
   });
 }

@@ -48,4 +48,35 @@ describe("classifyFindings", () => {
     expect(result.map((f) => f.href)).toEqual(["/a", "/b"]);
     expect(input[0].statuses.size).toBe(0); // original untouched
   });
+
+  // T035/T036 wiring — classifyOrigin/attribute are pure functions with
+  // their own test files; this asserts the SEAM usePageScan actually calls
+  // populates both fields on the finding (rule 88: a check nothing invokes
+  // is worse than no check).
+  it("wires structural origin: a footer anchor classifies chrome, a main anchor classifies content", () => {
+    const html = `<body><footer><a href="/footer-link">F</a></footer><main><a href="/body-link">B</a></main></body>`;
+    const [footerFinding, mainFinding] = classifyFindings(
+      [seed("/footer-link", 1), seed("/body-link", 2)],
+      html,
+    );
+    expect(footerFinding.origin).toBe("chrome");
+    expect(mainFinding.origin).toBe("content");
+  });
+
+  it("wires attribution: a content-origin link with a matching presentationDetails entry attributes; a chrome-origin link never attempts to", () => {
+    const html = `<body><footer><a href="/footer-link">F</a></footer><main><section><a href="/body-link">B</a></section></main></body>`;
+    const presentationDetails = JSON.stringify([
+      { id: "r1", instanceId: "i1", placeholderKey: "headless-main", dataSource: "11111111-1111-1111-1111-111111111111" },
+    ]);
+    const [footerFinding, mainFinding] = classifyFindings(
+      [seed("/footer-link", 1), seed("/body-link", 2)],
+      html,
+      presentationDetails,
+    );
+    expect(footerFinding.attribution).toBeNull();
+    expect(mainFinding.attribution).toEqual({
+      fieldPath: "headless-main > Section 1",
+      target: { itemId: "11111111-1111-1111-1111-111111111111" },
+    });
+  });
 });

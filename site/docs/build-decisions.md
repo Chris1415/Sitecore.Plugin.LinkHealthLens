@@ -473,3 +473,62 @@ the panel never blanks over a single bad lookup.
 T033's M1 table over ≥5 named pages and T034's M1/M4 real-tenant smoke + the TR-4 pixel compare
 (`index.html`, `group-unpublished-closed.html`) — `logScanTiming` is wired and fires on every scan, but
 recording the table and running the smoke needs the real devrel Pages canvas.
+
+## TR-5 (T035–T040)
+
+**T035 — structural origin, and the fallback for an anchor outside all four landmarks.**
+`classifyOrigin(ordinal, html)` re-parses the page HTML and uses `Element.closest('header, nav, footer')`
+vs `closest('main')` — the ONLY structural signal probe (f) found (no `data-component` /
+`data-placeholder` / `data-sc-*` anywhere in the captured markup). Its signature takes no attribution
+input at all, which is what makes "origin changes when attribution fails" structurally impossible to
+reintroduce, not merely avoided by convention (ADR-0006). **Fallback for an anchor in none of the four
+landmarks** (should not occur on this head app — Layout.tsx always wraps rendered content in `<main>`,
+reference_content_sdk_layout_already_emits_landmarks — but a caller could pass a stale ordinal against
+a different HTML string): `'chrome'`, on the reasoning that the worse failure mode is a genuinely
+un-landmarked node being *offered* an owner-and-open control it cannot honestly back, not being told
+it's chrome.
+
+**T036 — attribution granularity (OQ-3): RENDERING-level, not field-level, and why.**
+`pageInfo.presentationDetails` (a JSON *string* — `PageInfoPageVersion.presentationDetails?: string`,
+`client/dist/sdk-types.d.ts`) parses to `{ id, instanceId, placeholderKey, dataSource, parameters }[]`
+per probe (d)'s addendum. That maps a *placeholder region* to the *item* backing it — never an anchor
+to a *field* (there is no DOM marker tying a rendered element back to a placeholder instance; component
+boundaries in the captured markup are plain BEM class names like `hero`/`destgroup`, not machine-
+readable). The mechanism built here order-correlates `<main>`'s direct children against
+`presentationDetails` entries by POSITION (a page's own body renderings arrive in document order in
+both lists; its header/footer chrome is a separate Partial Design and is not part of a page's own
+`presentationDetails` at all). **This is an assumption, not a verified fact** — no fixture on disk
+pairs a captured `presentationDetails` payload with the same page's captured HTML (the shape is
+documented in prose in `probe-findings-t008-20260901T090000Z.md` § d, not raw-captured under
+`project-planning/captures/`). To keep a wrong guess from ever outranking an honest "field not
+identified", `attribute()` refuses (returns `null`) whenever the section count and rendering count
+disagree, rather than pick one plausible pairing — the same "no control may promise a resolution the
+platform cannot perform" discipline ADR-0010 states for the jump surface, applied here to the weaker
+claim a mis-paired label would make. Honest consequence: M3 (T039) will read LOW on any page with more
+layout wrapper elements under `<main>` than renderings (common — see the real Zephira Home fixture,
+which has non-rendering wrapper `<section>`s), and that is intentional, not a bug to paper over.
+
+**T037 — "Open in canvas", not "Jump to field", and the confirmation copy.** Probe (g) REFUTED
+field-level selection outright (`client.getValue()` throws `CoreError: not implemented`; the only
+mutate keys at runtime are `pages.reloadCanvas` and `pages.context`; `PagesContextParams` carries no
+field selector). `JumpAction` therefore calls `client.mutate('pages.context', { itemId })` — item-level
+navigation — and is labelled for exactly that. Two copy strings deliberately diverge from the POC's
+literal text (`panel.js` § `renderOrigin`, which still reads "Jump to field" / "Field selected in the
+canvas" because the POC is a frozen visual reference predating ADR-0010): the visible button label is
+**"Open in canvas"** and the post-action confirmation is **"Opened in the canvas"** — neither claims
+field-level precision. `pages.context`'s mutation params carry no `sitecoreContextId` field
+(`MutationMap['pages.context'].params: PagesContextParams`), unlike the `xmc.*` REST/GraphQL calls
+elsewhere in this app, so none is threaded through here — confirmed against the `.d.ts`, not assumed.
+
+**T038/T040 — OriginAffordance / ChromeOnly scoping.** `OriginAffordance` is a single-return, three-way
+switch (chrome / unattributed / JumpAction) — mutual exclusivity is structural, not merely tested.
+`ChromeOnly`/`isChromeOnly` are scoped to the ALL-chrome case only; the partial-chrome sub-line ("N of
+them are site chrome...") needs the full precedence-headline group counts T042 (TR-6, VerdictHead)
+owns, and building it here would preempt that contract the same way TR-3/TR-4 avoided preempting
+TR-6's row/group UI.
+
+**T039 — M3 is a real-tenant number, not yet measured.** `computeAttributionRate`/`logAttributionRate`
+are wired into `usePageScan` and fire on every scan (console only, NFR-3), but no fixture on disk pairs
+a real page's HTML with its `presentationDetails`, so no real M3 rate has been measured in this pass —
+same "outstanding operator step" treatment as M1/M2/M4 in TR-1 through TR-4 (Mode A has no mock-client
+path). Given T036's conservative refusal rule, expect the real-tenant number to be LOW until re-measured.

@@ -10,6 +10,7 @@ import { extractAnchors } from "@/lib/scan/extractAnchors";
 import { classifyFindings } from "@/lib/scan/classifyFindings";
 import { resolveInternalFindings } from "@/lib/scan/resolveFindings";
 import { fetchPageHtml } from "@/lib/sdk/pagesGetPageHtml";
+import { computeAttributionRate, logAttributionRate } from "@/lib/scan/attributionRate";
 import { freshHealth, type PageScan } from "@/lib/model/types";
 
 export type ScanStatus = "loading" | "error" | "ready";
@@ -91,10 +92,16 @@ export function usePageScan(): UsePageScanResult {
         return;
       }
 
-      // TR-3: scope + string checks + in-page anchor check run over every
-      // seed finding as soon as the page HTML is in hand — the same html
-      // that answered extraction also answers the anchor check.
-      const stringChecked = classifyFindings(extractAnchors(result.html), result.html);
+      // TR-3/TR-5: scope + string checks + in-page anchor check + structural
+      // origin + best-effort attribution run over every seed finding as soon
+      // as the page HTML is in hand. `presentationDetails` (T036) comes off
+      // the SAME pages.context payload that seeded this scan, not a
+      // separate fetch — it is a JSON string on pageInfo (§ 4c-6).
+      const stringChecked = classifyFindings(
+        extractAnchors(result.html),
+        result.html,
+        ctx.pageInfo?.presentationDetails,
+      );
 
       // TR-4 (ADR-0009): two-call CM resolution over every internal-scope
       // finding, de-duplicated by resolved path. Never blanks the panel on
@@ -113,6 +120,10 @@ export function usePageScan(): UsePageScanResult {
         pageName: page.name,
       });
       if (cancelled || thisScanId !== scanIdRef.current) return;
+
+      // T039 (M3): developer-console only, same discipline as M1's
+      // logScanTiming — no telemetry, no persistence (NFR-3).
+      logAttributionRate(page.name || page.path || page.id, computeAttributionRate(findings));
 
       setScan({
         page: { ...page, language: page.language },
