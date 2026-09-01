@@ -414,3 +414,62 @@ redirected or 404'd. Rationale: ADR-0004 fixes the app to exactly one *registere
 of the app's registered surface, so what it shows is inert. Keeping the demo costs nothing and gives a
 cheap local sanity check that `application.context` resolves outside the Pages canvas too. Revisit if this
 reads as confusing during code review.
+
+## TR-4 (T028–T034) — two-call internal resolution, built on ADR-0009/0010, not the original T029 plan
+
+**Mechanism rebuilt per the run brief's Addendum**, superseding § 4c-6's `pagesGetPagePathByLiveUrl`
+call: `resolveInternal.ts` normalizes an href to a site-relative content-tree path
+(`normalizeInternalTarget.ts` — strip query + fragment, exclude `/-/…` media/asset paths, join to
+`siteInfo.rootPath`), then `resolveItemByPath.ts` looks it up via `xmc.authoring.graphql`
+(`item(where:{path,language})`). No result ⇒ `not-found`, terminal. A hit carries `itemId` + `name`
+forward to `resolveLiveState.ts` (call 2), which tries the live-Edge lead (`checkLiveViaEdge.ts`, via
+`xmc.live.graphql` — present ⇒ `published`, absent ⇒ `unpublished`, decisively) and falls back to
+`getLivePageState.ts` only when the lead itself can't be reached, emitting the merged
+`not-found-or-unpublished` label (AC-3.3) on a 404 there, since that path alone can't distinguish
+*not-live* from *wrong params* (probe (b)).
+
+**GraphQL unwrap — `xmc.authoring.graphql` and `xmc.live.graphql` are `client.mutate`, DOUBLE unwrap,
+body INSIDE `params`.** § 4c-6 stated a blanket "every `xmc.*` query is double unwrap" written before
+these two calls existed in the plan; the `sitecoreai-graphql-schemas` skill's own § 6 note ("mutations
+on the XMC module are SINGLE-unwrap") is the WRONG generalisation for these two specifically — the
+`marketplace-sdk-xmc` skill § 6c is explicit and more specific: GraphQL passthroughs double-unwrap
+(`result.data.data`) and the body must nest inside `params`, unlike XMC's REST-style mutations. Cited,
+not borrowed from a sibling file directly — the skill documents this as the defect two prior apps
+(`last-edit-trail`, `component-usage-atlas`) shipped wrong; no sibling source was opened for TR-4 (the
+`external_reference: cite-required` siblings named in § 4c-1 — `quickcopy`, `component-usage-atlas`,
+`pageshot` — cover panel-shell/page-context patterns, none of which TR-4 touches).
+
+**`sitecoreContextId` split — `.preview` for both GraphQL-passthrough calls used here, `.live` for the
+live-Edge lead only.** `xmc.authoring.graphql` reads the CM working tree (same class as
+`pagesGetPageHtml`, already on `.preview`); `getLivePageState` is a CM/agent-class REST endpoint, so it
+follows the same convention. `xmc.live.graphql` is the one call in this app that genuinely reads the
+Delivery/Edge surface, so it is the one call sourced from `.context.live`. `usePageScan` now reads both
+off `AppContextContext`.
+
+**De-duplication is ONE level, by resolved path, not two (path then itemId) as the original T029 text
+specified.** The addendum states this explicitly ("De-duplication moves earlier — by resolved path,
+before resolution, not by itemId after it... 57 anchors reduce to 20 distinct") and it is sufficient
+under path-based resolution: query-string/fragment variants of one href already collapse to the same
+path at normalization time, which is the only source of duplication the captured page exhibits. The
+"two different hrefs resolving to the same itemId via a different path" case from the original spec
+(e.g. aliases/redirects) is not handled by a second dedup pass — out of scope for this mechanism and
+not observed on the measured tenant.
+
+**`getLivePageState`'s 404 throw-vs-return shape is UNVERIFIED in-app** — the T007 capture is the raw
+out-of-band REST 404, not a `client.query()` result, and `marketplace-sdk-client` § 3a documents the
+verb returning `{ data, error, status, ... }` without confirming whether a 404 resolves that shape or
+throws. `getLivePageState.ts` handles both (a resolved result carrying `status`/`error`, and a thrown
+error carrying `status`), each unit-tested. **Open item for the T034 real-tenant smoke**: watch the
+console during the smoke run to confirm which branch actually fires; this call is the fallback path
+only (the live-Edge lead is tried first and is decisive when reachable), so getting this wrong degrades
+to `could-not-check` rather than a wrong headline.
+
+**Health-flag semantics (NFR-2, T032)**: `health.resolution` / `health.liveState` flip `false` only on a
+*systemic* failure — every attempted call-1 (respectively call-2) failed. A partial failure (some paths
+resolve, one doesn't) leaves the flag `true` and marks only the affected findings `could-not-check`, so
+the panel never blanks over a single bad lookup.
+
+**Not delivered in this pass (operator/real-tenant steps, same treatment as T014/T019/T020's precedent)**:
+T033's M1 table over ≥5 named pages and T034's M1/M4 real-tenant smoke + the TR-4 pixel compare
+(`index.html`, `group-unpublished-closed.html`) — `logScanTiming` is wired and fires on every scan, but
+recording the table and running the smoke needs the real devrel Pages canvas.

@@ -37,16 +37,25 @@ export const SCOPE_TIER_NEVER_BODY =
 // so a "fixed string" cannot quietly diverge between a component and its test.
 export const STATUS_LABEL = {
   ok: "No findings",
+  "not-found": "Target not found",
+  unpublished: "Not published yet",
+  "not-found-or-unpublished": "Not found or not published",
   malformed: "Malformed link",
   "insecure-scheme": "Insecure scheme (http://)",
   "missing-anchor": "No matching anchor on this page",
+  "could-not-check": "Could not check",
   "reachability-not-checked": "Reachability not checked",
 } as const;
 
 export const STATUS_DETAIL = {
+  "not-found": "No item in the CM matches this path.",
+  unpublished: "The target exists but is not published.",
+  "not-found-or-unpublished":
+    "The CM did not distinguish a missing item from an unpublished one.",
   malformed: "The href is empty or cannot be parsed.",
   "insecure-scheme": "The href text starts with http://. The destination was not contacted.",
   "missing-anchor": "No element on this page carries that id or name.",
+  "could-not-check": "A check failed for this link. That is not a verdict about the link.",
   "reachability-not-checked":
     "This app never contacts a destination. Its format and scheme were checked; whether it responds was not.",
 } as const;

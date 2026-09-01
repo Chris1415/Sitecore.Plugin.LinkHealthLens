@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppContext, useMarketplaceClient } from "@/components/providers/marketplace";
 import { extractAnchors } from "@/lib/scan/extractAnchors";
 import { classifyFindings } from "@/lib/scan/classifyFindings";
+import { resolveInternalFindings } from "@/lib/scan/resolveFindings";
 import { fetchPageHtml } from "@/lib/sdk/pagesGetPageHtml";
 import { freshHealth, type PageScan } from "@/lib/model/types";
 
@@ -37,6 +38,9 @@ export function usePageScan(): UsePageScanResult {
   // currently is in the editor, which may be unpublished; `.live` would fail
   // or return stale markup for an unpublished page (docs/build-decisions.md).
   const contextId = appContext.resourceAccess?.[0]?.context?.preview;
+  // TR-4 (T030): the live-Edge lead genuinely reads the Delivery surface —
+  // the one call in this app that needs `.live` rather than `.preview`.
+  const liveContextId = appContext.resourceAccess?.[0]?.context?.live;
   const [status, setStatus] = useState<ScanStatus>("loading");
   const [scan, setScan] = useState<PageScan | null>(null);
   // Guards a slow HTML fetch resolving after a newer selection already reset
@@ -90,11 +94,30 @@ export function usePageScan(): UsePageScanResult {
       // TR-3: scope + string checks + in-page anchor check run over every
       // seed finding as soon as the page HTML is in hand — the same html
       // that answered extraction also answers the anchor check.
-      const findings = classifyFindings(extractAnchors(result.html), result.html);
+      const stringChecked = classifyFindings(extractAnchors(result.html), result.html);
+
+      // TR-4 (ADR-0009): two-call CM resolution over every internal-scope
+      // finding, de-duplicated by resolved path. Never blanks the panel on
+      // failure (NFR-2) — a systemic failure degrades the health flag, a
+      // partial one only marks the findings it actually touched.
+      const { findings, health: resolutionHealth } = await resolveInternalFindings(stringChecked, {
+        // siteInfo.rootPath is real at runtime (probe (d) addendum) but sits
+        // outside PagesContextSiteInfo's declared fields — the interface's
+        // own `[key: string]: any` index signature is what makes this a
+        // type-safe read rather than a cast.
+        siteRootPath: ctx.siteInfo?.rootPath,
+        language: page.language,
+        client,
+        authoringContextId: contextId,
+        liveContextId,
+        pageName: page.name,
+      });
+      if (cancelled || thisScanId !== scanIdRef.current) return;
+
       setScan({
         page: { ...page, language: page.language },
         findings,
-        health: freshHealth(),
+        health: { ...freshHealth(), ...resolutionHealth },
         completedAt: Date.now(),
       });
       setStatus("ready");
@@ -119,7 +142,7 @@ export function usePageScan(): UsePageScanResult {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [client, contextId]);
+  }, [client, contextId, liveContextId]);
 
   return { status, scan };
 }
