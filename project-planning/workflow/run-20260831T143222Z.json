@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T13:30:00Z",
+  "updated_at": "2026-09-01T14:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -56,7 +56,7 @@
   "variables": {
     "mode": "client-side"
   },
-  "status": "probe_complete",
+  "status": "in_progress",
   "// work_item_type — schema 8 discriminator": [
     "work_item_type is the keystone discriminator set at intake by /create-prd (prd), /create-frd (frd), or /create-bug (bug). Every downstream command reads it to pick the weight-preset, the operator-gate count (prd=2, frd=1, bug=0+valves), and which stages to skip (bug skips architect+UI; frd skips architect+UI unless an ADR-worthy decision or UI scope exists).",
     "SAME ARTIFACT SLOTS, DIFFERENT FILL. canonical_artifacts.prd / prd_minimal hold the SPEC and SPEC-MINIMAL regardless of type — for an FRD they point at frd-NNN.md / frd-minimal-NNN.md; for a bug at bug-NNN.md / bug-minimal-NNN.md. The slot names stay `prd` / `prd_minimal` so downstream read paths (esp. Developer-08's `prd_minimal + task_breakdown`) are unchanged. The misnomer is intentional and documented.",
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "TR-4 (two-call internal resolution). ALSO: the known-bad smoke page does not trip any TR-3 check — decide how to get a page that genuinely exercises the checks before TR-6's smoke.",
+  "next_action": "TR-4 — two-call internal resolution + status sets (T028-T034), per ADR-0009.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -433,6 +433,18 @@
       "known_bad_zephira": "59 anchors, 0 findings",
       "diagnosis": "NOT a defect. TR-3's four checks are arithmetically correct on this page: no href carries an http: scheme (all 56 are relative), the only malformed candidates are a bare '#' and 2 no-href anchors which are exempt by operator decision, reachability-not-checked applies only to external rows and there are zero absolute links, and #content resolves. The page simply does not exercise the checks.",
       "consequence": "The smoke plan currently proves nothing. Control-clean and known-bad-clean are the same result; the control only carries meaning once the known-bad page produces findings. This was flagged as a RISK when the pages were picked (Zephira's documented defects are route-path divergences on the LIVE surface, while this app checks CM-side state) and is now MEASURED rather than suspected."
+    },
+    "FIRST-REAL-HOST-RENDER": {
+      "outcome": "pass",
+      "evidence": "Operator opened the panel in the live Cloud Portal Pages canvas on a Velaro page and it listed the page's links. This is the FIRST end-to-end success in the real host: every prior gate was a unit test, a lint, a build or a static check, and nothing had ever been rendered through a real handshake.",
+      "closes": "The 'never rendered in the real host' gap open since TR-1. Also supplies TR-1's and TR-2's live evidence that Mode A prevented earlier.",
+      "expected_count_for_T019": "Velaro Home on devrel, language en: 17 anchors total, 17 with an href, 0 without, 16 distinct, 16 relative, 0 absolute, 1 in-page anchor. If the panel shows 17, T019's live reconciliation leg is closed."
+    },
+    "contextid-defect": {
+      "outcome": "fixed",
+      "severity": "would have blocked every real call",
+      "cause": "fetchPageHtml omitted sitecoreContextId, which Mode A requires on almost every XMC call (marketplace-sdk-xmc section 6a). Fixed at bf44dab: sourced from application.context resourceAccess[0].context.preview, GUARDED not cast, with no-context / request-failed / bad-envelope now distinguished and logged.",
+      "why_no_gate_caught_it": "TWO gates passed and the call still failed. The SDK contract gate passed because sitecoreContextId is OPTIONAL in the generated types. The out-of-band probe passed because a CM bearer token carries tenant scope implicitly. Neither exercised the portal-brokered path, which is the only path that ships. A probe that verifies an API CONTRACT has not verified the CALL PATH."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -841,7 +853,8 @@
     "probe_findings_reverified_on_devrel": "All load-bearing findings re-measured against devrel and IDENTICAL to devex: 0 of 7 sites carry a targetHostname; pagesGetPageHtml returns 200 {pageId, html}; Zephira Home has 57 anchors / 20 distinct / 56 relative / 0 absolute; landmarks header 6, nav 4, footer 4, main 49; no data-* structural hints; path-by-url 404s with 'No matching site found for hostname'. ADR-0009, ADR-0006 and ADR-0010 therefore stand on evidence from the tenant the app actually runs in. Devrel capture saved as captures/agent-page-html-zephira-home.DEVREL.json.",
     "tr2_m2_control": "The M2 reconciliation harness compares the extractor against an INDEPENDENTLY implemented DOM query, not against its own output, and ships a working self-test control proving the comparison can fail. That is the anti-circularity requirement QA set at task-breakdown time, honoured rather than approximated.",
     "tr2_language_guard": "usePageScan guards the case where no language is available on pageInfo or siteInfo, instead of defaulting to 'en'. Modelled as health.pageHtml=false plus an error state, because PageScan.health has no dedicated member. The Developer flagged this as a READING of the contract rather than a gap — QA may want it named distinctly at /test.",
-    "mutation_discipline": "Any mutation harness must prove the mutation landed before trusting the result. This run has now hit that trap once, in the orchestrator's own verification, having already recorded it from the koven Gate-3 run. Knowing the trap did not prevent walking into it; asserting the mutation did."
+    "mutation_discipline": "Any mutation harness must prove the mutation landed before trusting the result. This run has now hit that trap once, in the orchestrator's own verification, having already recorded it from the koven Gate-3 run. Knowing the trap did not prevent walking into it; asserting the mutation did.",
+    "framework_finding_candidate_6": "Sixth instance of the F38 pattern, and the sharpest: a probe verified the API contract out-of-band and a type gate verified the signature, both green, while the actual in-app call path was never exercised and failed on first contact. Worth filing beside F38 — the counter-move is not another gate but running the thing THROUGH THE PATH THAT SHIPS."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
