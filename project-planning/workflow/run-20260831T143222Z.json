@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T09:40:00Z",
+  "updated_at": "2026-09-01T10:15:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -56,7 +56,7 @@
   "variables": {
     "mode": "client-side"
   },
-  "status": "probe_complete_partial",
+  "status": "probe_complete",
   "// work_item_type — schema 8 discriminator": [
     "work_item_type is the keystone discriminator set at intake by /create-prd (prd), /create-frd (frd), or /create-bug (bug). Every downstream command reads it to pick the weight-preset, the operator-gate count (prd=2, frd=1, bug=0+valves), and which stages to skip (bug skips architect+UI; frd skips architect+UI unless an ADR-worthy decision or UI scope exists).",
     "SAME ARTIFACT SLOTS, DIFFERENT FILL. canonical_artifacts.prd / prd_minimal hold the SPEC and SPEC-MINIMAL regardless of type — for an FRD they point at frd-NNN.md / frd-minimal-NNN.md; for a bug at bug-NNN.md / bug-minimal-NNN.md. The slot names stay `prd` / `prd_minimal` so downstream read paths (esp. Developer-08's `prd_minimal + task_breakdown`) are unchanged. The misnomer is intentional and documented.",
@@ -327,6 +327,18 @@
         "(e) refuted — the endpoint ADR-0008 was built on cannot be called with relative hrefs on a tenant with no site hostnames",
         "(d) and (g) need an authenticated portal session"
       ]
+    },
+    {
+      "stage": "probe_complete",
+      "agent": "08-developer",
+      "outcome": "completed",
+      "one_line": "TR-0 closed: a/c/d/f confirmed, e+g refuted, b ambiguous with a TR-4 lead; estate proven devex by __Revision",
+      "deliverables": [
+        "products/marketplace/link-health-lens/project-planning/plans/probe-findings-t008-20260901T090000Z.md"
+      ],
+      "escalations": [
+        "(g) refuted — AC-7.1/AC-7.4 describe a capability the platform does not offer"
+      ]
     }
   ],
   "// stage_history — schema 7 contract": [
@@ -351,7 +363,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "T006 harness building; then the operator runs it once in the devex Pages canvas and pastes the blob back to close probes (d) and (g). TR-1 starts after T008 closes.",
+  "next_action": "OPERATOR DECISION: probe (g) refuted — field-level selection does not exist at runtime. Decide the jump affordance's fate, then TR-1 starts.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -360,17 +372,24 @@
   ],
   "smoke_outcomes": {
     "TR-0-probe": {
-      "outcome": "partial",
+      "outcome": "complete",
       "confirmed": [
         "(a) pagesGetPageHtml returns rendered HTML — Agent.PageHtmlResponse matches; 57 anchors on Zephira Home",
         "(c) sites list shape",
-        "(f) A4 — structural chrome/content signal EXISTS via HTML landmarks (header 6 / nav 4 / footer 4 / main 49 anchors)"
+        "(f) A4 — structural chrome/content signal EXISTS via HTML landmarks (header 6 / nav 4 / footer 4 / main 49 anchors)",
+        "(a) rendered HTML",
+        "(c) sites shape",
+        "(f) A4 via HTML landmarks",
+        "(d) pages.context payload — carries siteInfo.rootPath AND pageInfo.presentationDetails"
       ],
       "refuted": [
-        "(e) path-by-url — resolves by hostname->site, 0 of 7 sites carry a targetHostname, and it rejects relative URLs while 56 of 57 anchors are relative"
+        "(e) path-by-url — resolves by hostname->site, 0 of 7 sites carry a targetHostname, and it rejects relative URLs while 56 of 57 anchors are relative",
+        "(e) path-by-url — hostname-keyed, no site has one, rejects relative URLs",
+        "(g) field-level selection does not exist: runtime mutate keys are exactly [pages.reloadCanvas, pages.context], getValue is not implemented, item-level navigation succeeds"
       ],
       "ambiguous": [
-        "(b) getLivePageState — 404 on BOTH Zephira Home and Koven Home; nothing distinguishes 'not live' from 'params wrong'. AC-3.3's merged label fires."
+        "(b) getLivePageState — 404 on BOTH Zephira Home and Koven Home; nothing distinguishes 'not live' from 'params wrong'. AC-3.3's merged label fires.",
+        "(b) getLivePageState 404 on both pages; AGQL has no publishing field on Item so the two-call shape cannot collapse. Lead for TR-4: query LIVE Edge for the target — present means published — via xmc.live.graphql, which is portal-brokered. Untested out-of-band (both endpoint forms rejected the raw context id)."
       ],
       "not_captured": [
         "(d) pages.context payload",
@@ -630,6 +649,20 @@
       "severity": "warn",
       "item": "ADR-0009 moves de-duplication BEFORE resolution and adds two normalisation steps (strip query/fragment; exclude media paths) that the task breakdown planned under the old mechanism. TR-2 and TR-4 task text should be re-read against ADR-0009 before they are implemented — the tranches were written when path-by-url was the plan.",
       "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] T008 — probe (g) REFUTED at runtime, not merely by types: mutate keys are exactly [pages.reloadCanvas, pages.context], getValue is not implemented, and item-level navigation SUCCEEDS. AC-7.1 ('selects that field in the canvas') and AC-7.4 ('no jump action that does not resolve to a selectable field') describe a capability that does not exist. Shipping item-level navigation labelled 'Jump to field' remains forbidden. Three options, and presentationDetails makes the first genuinely good: (a) SHOW the owning rendering/datasource per link and navigate to that ITEM, labelled honestly; (b) drop the affordance, panel is read-only; (c) keep AC-7.4 and ship no jump at all. Recommendation: (a).",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "concern",
+      "severity": "info",
+      "item": "(b) remains ambiguous but now has a concrete lead rather than a dead end: query LIVE Edge for the target item via xmc.live.graphql (portal-brokered, declared SDK key) — present means published, absent means not, which is unambiguous where the 404 is not. TR-4 should try it before settling for AC-3.3's merged label.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -703,7 +736,9 @@
     "t008_decision_1": "RESOLVED by the operator: adopt the AGQL path lookup. ADR-0009 written; ADR-0008's first call superseded by amendment (its two-step SHAPE and step 2 stand). ADR-0002 untouched — still Mode A, no backing route, since xmc.authoring.graphql is portal-brokered.",
     "t008_decision_2": "RESOLVED: proceed with AC-3.3's merged 'not found or not published' label rather than blocking on a known-published control page. US-3 degrades honestly, which is what AC-3.3 was pre-committed for.",
     "adr_0009_consequences_for_planning": "Three items TR-2/TR-4 must now carry that the old mechanism did not need: (1) strip query + fragment before lookup — the captured page has SEVEN ?to= variants of one page; (2) exclude media and non-page paths (/-/media/...) BEFORE lookup, or every PDF link reports as target-not-found, which is exactly the false-positive class M4 exists to catch; (3) internal-vs-external classification loses the host list (empty) and falls back to href SHAPE — relative means internal, absolute means external — which classifies 56 of 57 correctly on the measured page.",
-    "dedup_saving_measured": "The captured page's 57 anchors reduce to 20 distinct — a 65% call saving before the first lookup. De-duplication now happens BEFORE resolution (by path), not after (by itemId) as ADR-0008 assumed."
+    "dedup_saving_measured": "The captured page's 57 anchors reduce to 20 distinct — a 65% call saving before the first lookup. De-duplication now happens BEFORE resolution (by path), not after (by itemId) as ADR-0008 assumed.",
+    "probe_d_design_wins": "Two things pages.context delivers that the plan did not know it had. (1) siteInfo.rootPath arrives with the context on every page selection, so ADR-0009 needs NO separate sites call to know the site root. (2) pageInfo.presentationDetails carries the full rendering list as JSON, each entry with { id, instanceId, placeholderKey, dataSource, parameters } — an attribution source far stronger than inferring from rendered HTML. It maps a REGION of the page to the ITEM backing it, which is most of the distance to an honest 'this link lives in X' affordance.",
+    "getvalue_not_implemented": "client.getValue() throws 'CoreError: [client SDK] getValue method is not implemented.' in 0.3.6. Irrelevant to this app (context panel, not custom field) but it means the custom-field read/write surface documented in the client skill does not exist in this SDK version."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
@@ -743,6 +778,12 @@
     ],
     "smoke_page_known_bad": "/sitecore/content/Zephira-Brand/Zephira/Home",
     "smoke_page_known_good_control": "/sitecore/content/Koven-Brand/Koven/Home",
-    "smoke_pages_provenance": "Proposed by the orchestrator from a read-only enumeration of the devex tenant, and the choice was DELEGATED by the operator ('go with what you think is fine'). Recorded this way deliberately: T001 forbids inventing a page, and delegated-with-reasoning is not the same as invented, but it is also not the same as operator-named. If either page proves unsuitable the pick moves — it is not a fact about the estate."
+    "smoke_pages_provenance": "Proposed by the orchestrator from a read-only enumeration of the devex tenant, and the choice was DELEGATED by the operator ('go with what you think is fine'). Recorded this way deliberately: T001 forbids inventing a page, and delegated-with-reasoning is not the same as invented, but it is also not the same as operator-named. If either page proves unsuitable the pick moves — it is not a fact about the estate.",
+    "app_installation_id": "1f5b9bc7-a49a-40dc-9f08-1a51c614213e",
+    "app_context_id": "aefafeaa-46ba-467d-b5ff-a441e3c34436",
+    "xmcloud_tenant_id": "29eac3eb-6cbb-42a4-1a72-08ded696f4f5",
+    "edge_context_preview": "51j9x7Prvy8OU2KYA0uEG6",
+    "edge_context_live": "1Uv6PcB6s4UmosKCGiukko",
+    "estate_confirmed_by": "__Revision d19307bf-915b-4a2f-be9f-9ca1e1a80eb5 on Velaro/Home matched between the in-portal probe and out-of-band devex AGQL, along with updatedBy and the timestamp. A revision GUID regenerates on every edit, so two independently-edited estates cannot share one — unlike item GUIDs (identical by construction) or the display name ('Hahn-Solo / cm' on BOTH estates)."
   }
 }
