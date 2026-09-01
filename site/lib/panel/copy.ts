@@ -47,6 +47,30 @@ export const STATUS_LABEL = {
   "reachability-not-checked": "Reachability not checked",
 } as const;
 
+// T038 (ADR-0006) — the three-way origin affordance. Two of the three are
+// FIXED, verbatim constants (never reworded, never softened): the em-dash is
+// load-bearing.
+export const ORIGIN_CHROME_LABEL = "site chrome — not editable from this page";
+export const ORIGIN_UNATTRIBUTED_LABEL = "in your content — field not identified";
+
+// T037 (ADR-0010, superseding AC-7.1/AC-7.4) — there is no field-level
+// selection on this platform (probe (g), REFUTED). The declared mutation
+// surface navigates to an ITEM (`client.mutate('pages.context', { itemId })`)
+// and nothing finer. "Open in canvas" is chosen deliberately over the POC's
+// "Jump to field" wording, which this build must never ship — it would
+// promise a resolution the platform cannot perform (ADR-0003's dead-
+// affordance principle, restated by ADR-0010). Deviation from the POC's
+// literal copy is recorded in docs/build-decisions.md.
+export const ORIGIN_OPEN_LABEL = "Open in canvas";
+export const ORIGIN_OPENED_CONFIRMATION = "Opened in the canvas";
+
+// T040 — the chrome-only sub-line (verbatim, source: panel.js § renderReady).
+// The PARTIAL-chrome form ("N of them are site chrome...") is T042's
+// (VerdictHead / TR-6) territory, which also needs the full precedence-
+// headline group counts this tranche does not build; scoping this file to
+// the ALL-chrome case keeps TR-5 from preempting that contract.
+export const CHROME_ONLY_SUBLINE = "Every one of them is site chrome — not editable from this page.";
+
 export const STATUS_DETAIL = {
   "not-found": "No item in the CM matches this path.",
   unpublished: "The target exists but is not published.",
