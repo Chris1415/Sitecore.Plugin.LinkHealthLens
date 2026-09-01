@@ -30,3 +30,23 @@ export const SCOPE_TIER_INTERNAL_BODY =
 export const SCOPE_TIER_NEVER_TITLE = "Never checked, on any link";
 export const SCOPE_TIER_NEVER_BODY =
   "whether the destination responds. This app makes no request to any link target, internal or external.";
+
+// Status labels + headline detail copy (T024/T026, source: POC panel.js §
+// STATUS/DETAIL). Only the members TR-3 introduces are defined here; TR-4/5
+// amend this file with the rest as their checks land — one source of truth
+// so a "fixed string" cannot quietly diverge between a component and its test.
+export const STATUS_LABEL = {
+  ok: "No findings",
+  malformed: "Malformed link",
+  "insecure-scheme": "Insecure scheme (http://)",
+  "missing-anchor": "No matching anchor on this page",
+  "reachability-not-checked": "Reachability not checked",
+} as const;
+
+export const STATUS_DETAIL = {
+  malformed: "The href is empty or cannot be parsed.",
+  "insecure-scheme": "The href text starts with http://. The destination was not contacted.",
+  "missing-anchor": "No element on this page carries that id or name.",
+  "reachability-not-checked":
+    "This app never contacts a destination. Its format and scheme were checked; whether it responds was not.",
+} as const;
