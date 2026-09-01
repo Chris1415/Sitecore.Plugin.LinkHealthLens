@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T15:50:00Z",
+  "updated_at": "2026-09-01T16:20:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -468,6 +468,18 @@
       "trigger": "The live panel showed BOTH /Models (#6) and /models (#8) on one page — same target, different case. If the AGQL path lookup were case-sensitive, /models would report as target-not-found: a false finding on a good link, on the very page used for smoke.",
       "result": "AGQL path lookup is CASE-INSENSITIVE — /Models, /models and /MODELS all HIT the same item. Tested on devrel, all three forms. No normalisation needed for case, and TR-4 needs no change.",
       "why_recorded": "Sitecore resolves paths case-insensitively but the GraphQL layer did not have to agree. A prior framework defect had exactly this shape — audit-sitecore-schema.mjs matched paths case-sensitively and went blind to an entire brand. Tested rather than assumed."
+    },
+    "TR-5-exit": {
+      "outcome": "pass, with a measured defect now in fix",
+      "verified_independently": "tsc clean · 168/168 tests (33 files) · lint 0 errors · verify-poc 35/35 · comment-density exit 0",
+      "mutation_audit": "Exactly three client.mutate call sites, all accounted for: xmc.live.graphql and xmc.authoring.graphql (read-only GraphQL that the SDK mis-types as mutations — already flagged for T048's gate) plus JumpAction's single sanctioned pages.context navigation. No stray writes."
+    },
+    "M3-first-measurement": {
+      "outcome": "0% — below the 50% threshold, cause found",
+      "measured": "Velaro Home, 17 anchors. Structural origin: chrome 7 / content 10 — origin classification WORKS. Attribution: numerator 0, denominator 10, rate 0.",
+      "cause": "A DEPTH bug, not a design failure. attribute() correlates main.children against the presentationDetails entries and refuses on a count mismatch. The real DOM is <main id=main><div id=content><section>x5 — so main.children is 1 (a wrapper) while there are 5 renderings. Measured directly: 5 top-level <section> children of #content vs 5 renderings, an EXACT match one level deeper.",
+      "why_it_was_invisible": "The Developer flagged honestly that no fixture paired a captured presentationDetails with its own page's HTML, so attribution was unit-tested but unverified against real data. The orchestrator built that pair from the operator's in-portal probe blob plus a fresh HTML capture, and the defect appeared on the first real measurement.",
+      "fixtures_now_durable": "captures/agent-page-html-velaro-home.DEVREL.json + captures/velaro-home-presentation-details.DEVREL.json — the pair that was missing. Tier-1 tracked."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -805,6 +817,13 @@
       "severity": "info",
       "item": "T048's prohibition gate must exempt xmc.authoring.graphql and xmc.live.graphql. Both are read-only GraphQL but the SDK types them as mutations, so a naive 'no client.mutate' grep would fail a correct build. Flagged by TR-4 rather than discovered at TR-6.",
       "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "concern",
+      "severity": "warn",
+      "item": "M3 measured 0% against real data on first measurement — below A3's 50% threshold. Diagnosed as a depth bug (the correlation anchors at <main>, whose only child is a wrapper; the renderings are its grandchildren, 5 vs 5 exactly) and a bounded fix is in progress. If the fix does NOT bring M3 above 50%, that becomes a genuine A3/UX re-decision for you rather than a bug — the spec pre-committed that below ~50% the feature reads as broken rather than partial.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -894,7 +913,9 @@
     "framework_finding_candidate_6": "Sixth instance of the F38 pattern, and the sharpest: a probe verified the API contract out-of-band and a type gate verified the signature, both green, while the actual in-app call path was never exercised and failed on first contact. Worth filing beside F38 — the counter-move is not another gate but running the thing THROUGH THE PATH THAT SHIPS.",
     "tr4_flag_for_T048": "xmc.authoring.graphql and xmc.live.graphql are declared under MutationMap in the SDK despite being read-only GraphQL queries. T048's prohibition gate ('no client.mutate beyond the T037 canvas call') must treat these two as legitimate exceptions, or it will fail a correct build.",
     "tr4_open_shape": "getLivePageState's 404 throw-vs-return runtime shape is unverified in-app — T007's capture was raw out-of-band REST, not a client.query() result. Both shapes are unit-tested. Low risk because it is the FALLBACK path only and the live-Edge lead is tried first, but it is unproven until the real-tenant smoke.",
-    "panel_state_for_operator": "The live panel currently renders TR-2's RAW list with the provisional '17 links found' verdict. That is correct for this point in the build: TR-4 COMPUTES resolution, TR-6 RENDERS it. Absence of status chips is not a defect. Confirmation that TR-4 ran is the console line '[link-health-lens] scan complete: ...' with M1 timings."
+    "panel_state_for_operator": "The live panel currently renders TR-2's RAW list with the provisional '17 links found' verdict. That is correct for this point in the build: TR-4 COMPUTES resolution, TR-6 RENDERS it. Absence of status chips is not a defect. Confirmation that TR-4 ran is the console line '[link-health-lens] scan complete: ...' with M1 timings.",
+    "m3_metric_earned_its_keep": "M3 was designed to be failable — ADR-0006 rejected an attribution-derived denominator precisely because it would have read 100% by construction. With the structural denominator it read 0% and pointed straight at the cause. Had the earlier design shipped, TR-6 would have built UI on top of an attribution rate that could never fail.",
+    "attribution_fix_constraints": "The fix must descend through single-child wrappers with a BOUNDED depth and keep the refusal rule. An unbounded search for any node whose child count matches would find coincidental matches — reintroducing exactly the guessing the refusal exists to prevent. It must not hard-code #content or any class name: that is this head app's markup, not a contract."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,

@@ -1,0 +1,8 @@
+{"_captured":"devrel Velaro Home, from the operator's in-portal T006 probe blob, 2026-09-01",
+"_note":"pageInfo.presentationDetails as delivered by pages.context — the JSON STRING, parsed here for use as a fixture.",
+"devices":[{"id":"fe5d7fdf-89c0-4d99-9aa3-b5fbd009c9f3","layoutId":"96e5f4ba-a2cf-4a4c-a4e7-64da88226362","placeholders":[],"renderings":[
+{"id":"df6e35ac-6bc1-44e7-b9e1-e0401f39cf44","instanceId":"170fc100-d389-5450-9166-ab0dfad9ac7e","placeholderKey":"/headless-main","dataSource":"{D2E186FD-3C4A-4704-B535-55912941FD53}","parameters":{}},
+{"id":"a771eee4-21f8-4d7c-b92e-083ca1a5c81e","instanceId":"49ddc7b0-abef-46e4-888e-3d32773a4182","placeholderKey":"headless-main","dataSource":"63123e9d-2874-4c6c-b890-a48fca8dd167","parameters":{"GridParameters":"{7465D855-992E-4DC2-9855-A03250DFA74B}","FieldNames":"","Styles":"","RenderingIdentifier":"","CSSStyles":"","DynamicPlaceholderId":"1"}},
+{"id":"85108afe-fcfb-4047-8889-b61f08585d80","instanceId":"2f79e92d-79c2-450c-a111-5161cfa91af6","placeholderKey":"/headless-main","dataSource":"{98A3D75E-9F64-4ACF-83BC-EE2C2ED05136}","parameters":{}},
+{"id":"ea78396e-51d5-4307-95f8-9408535cde5f","instanceId":"9ff41558-c1f7-48ae-9f0e-463ae45b63e9","placeholderKey":"/headless-main","dataSource":"1c8fbadb-2d86-4910-b5b9-b75dc6c92410","parameters":{"GridParameters":"{7465D855-992E-4DC2-9855-A03250DFA74B}","FieldNames":"Teaser","Styles":"","RenderingIdentifier":"","CSSStyles":"","DynamicPlaceholderId":"2"}},
+{"id":"d6b05a79-a171-4d3d-adbe-c341bb9a0812","instanceId":"807f7f74-def8-3e4d-9601-d3efc194b4c4","placeholderKey":"/headless-main","dataSource":"{5896F295-2253-4381-8765-0A46B91AD393}","parameters":{}}]}]}
