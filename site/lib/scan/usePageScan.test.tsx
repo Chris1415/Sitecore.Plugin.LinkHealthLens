@@ -14,7 +14,15 @@ const STUB_APP_CONTEXT: ApplicationContext = {
   id: "app-1",
   url: "https://example.test",
   resourceAccess: [
-    { context: { live: "ctx-live-1", preview: "ctx-preview-1" } },
+    // Shaped from the REAL application.context captured in the portal
+    // (project-planning/captures/) — resourceId and tenantId are required by
+    // ApplicationResourceContext and were missing, which failed `tsc --noEmit`
+    // silently since TR-2: `next build` does not traverse test files.
+    {
+      resourceId: "xmcloud",
+      tenantId: "29eac3eb-6cbb-42a4-1a72-08ded696f4f5",
+      context: { live: "ctx-live-1", preview: "ctx-preview-1" },
+    },
   ],
 };
 

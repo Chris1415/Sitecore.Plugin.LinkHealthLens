@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T14:30:00Z",
+  "updated_at": "2026-09-01T15:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "TR-4 — two-call internal resolution + status sets (T028-T034), per ADR-0009.",
+  "next_action": "Restart the dev server and re-open the panel — internal links should now carry resolved statuses. Then TR-5.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -445,6 +445,18 @@
       "severity": "would have blocked every real call",
       "cause": "fetchPageHtml omitted sitecoreContextId, which Mode A requires on almost every XMC call (marketplace-sdk-xmc section 6a). Fixed at bf44dab: sourced from application.context resourceAccess[0].context.preview, GUARDED not cast, with no-context / request-failed / bad-envelope now distinguished and logged.",
       "why_no_gate_caught_it": "TWO gates passed and the call still failed. The SDK contract gate passed because sitecoreContextId is OPTIONAL in the generated types. The out-of-band probe passed because a CM bearer token carries tenant scope implicitly. Neither exercised the portal-brokered path, which is the only path that ships. A probe that verifies an API CONTRACT has not verified the CALL PATH."
+    },
+    "TR-4-exit": {
+      "outcome": "pass",
+      "verified_independently": "tsc --noEmit CLEAN (was red) · 134/134 tests (27 files) · lint 0 errors · verify-poc 35/35 · comment-density exit 0",
+      "mechanism": "ADR-0009 path lookup via xmc.authoring.graphql, then publish state via a live-Edge lead (xmc.live.graphql) falling back to getLivePageState's ambiguous 404 (AC-3.3). De-duplicated by resolved path, bounded concurrency, M1 timing instrumented.",
+      "outstanding_operator_legs": "T033/T034 real-tenant M1 timing over 5+ named pages, the M1/M4 smoke, and the TR-4 pixel compare — same Mode A limitation as T014/T019/T020."
+    },
+    "typecheck-gate-was-red": {
+      "outcome": "fixed",
+      "finding": "tsc --noEmit had been FAILING since TR-2 on a test fixture missing resourceId/tenantId from ApplicationResourceContext. TR-4's Developer found it, correctly identified it as pre-existing and left it as out of scope. The orchestrator verified the pre-existing claim by running tsc at commit bf44dab in a throwaway worktree — identical error, so the claim was honest.",
+      "why_it_survived": "next build does not traverse test files, so a green build hid a red typecheck. AND TR-3's report explicitly claimed 'tsc --noEmit clean' — a false status claim in prose that nothing gated. Same pattern as the TR-1 Critical, where docs/build-decisions.md claimed the probe harness was deleted while it was still reachable.",
+      "fix": "Fixture reshaped from the REAL captured application.context, with a comment naming why it went unnoticed. tsc now clean."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -768,6 +780,20 @@
       "severity": "warn",
       "item": "The known-bad smoke page does not trip any TR-3 check — measured, 0 findings on 59 anchors, and the arithmetic says that is correct rather than broken. So M4's control currently passes trivially and the smoke proves nothing. Three ways forward: (a) wait for TR-4, whose internal-existence and publish-state checks may fire on Zephira where the string checks cannot; (b) author a deliberate test page carrying a genuinely bad link set — one http:// link, one empty href, one #missing anchor, one link to a deleted page — which is a REAL-TENANT WRITE and needs your consent even though gates.go_live is off; (c) accept unit-fixture coverage only and drop the live known-bad page, recording that the end-to-end smoke is fixture-based. Recommendation: (a) first, since it costs nothing and TR-4 is next, then (b) only if TR-4 also comes back empty.",
       "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "concern",
+      "severity": "warn",
+      "item": "A gate was red for three tranches without anyone noticing: tsc --noEmit failed from TR-2 onward on a test fixture, hidden because next build skips test files, and TR-3's report positively claimed it was clean. Now fixed and verified. The lesson is not the type error — it is that a stage report asserting a gate passed is not evidence the gate ran.",
+      "status": "resolved"
+    },
+    {
+      "stage": "test",
+      "type": "decision",
+      "severity": "info",
+      "item": "T048's prohibition gate must exempt xmc.authoring.graphql and xmc.live.graphql. Both are read-only GraphQL but the SDK types them as mutations, so a naive 'no client.mutate' grep would fail a correct build. Flagged by TR-4 rather than discovered at TR-6.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -854,7 +880,9 @@
     "tr2_m2_control": "The M2 reconciliation harness compares the extractor against an INDEPENDENTLY implemented DOM query, not against its own output, and ships a working self-test control proving the comparison can fail. That is the anti-circularity requirement QA set at task-breakdown time, honoured rather than approximated.",
     "tr2_language_guard": "usePageScan guards the case where no language is available on pageInfo or siteInfo, instead of defaulting to 'en'. Modelled as health.pageHtml=false plus an error state, because PageScan.health has no dedicated member. The Developer flagged this as a READING of the contract rather than a gap — QA may want it named distinctly at /test.",
     "mutation_discipline": "Any mutation harness must prove the mutation landed before trusting the result. This run has now hit that trap once, in the orchestrator's own verification, having already recorded it from the koven Gate-3 run. Knowing the trap did not prevent walking into it; asserting the mutation did.",
-    "framework_finding_candidate_6": "Sixth instance of the F38 pattern, and the sharpest: a probe verified the API contract out-of-band and a type gate verified the signature, both green, while the actual in-app call path was never exercised and failed on first contact. Worth filing beside F38 — the counter-move is not another gate but running the thing THROUGH THE PATH THAT SHIPS."
+    "framework_finding_candidate_6": "Sixth instance of the F38 pattern, and the sharpest: a probe verified the API contract out-of-band and a type gate verified the signature, both green, while the actual in-app call path was never exercised and failed on first contact. Worth filing beside F38 — the counter-move is not another gate but running the thing THROUGH THE PATH THAT SHIPS.",
+    "tr4_flag_for_T048": "xmc.authoring.graphql and xmc.live.graphql are declared under MutationMap in the SDK despite being read-only GraphQL queries. T048's prohibition gate ('no client.mutate beyond the T037 canvas call') must treat these two as legitimate exceptions, or it will fail a correct build.",
+    "tr4_open_shape": "getLivePageState's 404 throw-vs-return runtime shape is unverified in-app — T007's capture was raw out-of-band REST, not a client.query() result. Both shapes are unit-tested. Low risk because it is the FALLBACK path only and the live-Edge lead is tried first, but it is unproven until the real-tenant smoke."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
