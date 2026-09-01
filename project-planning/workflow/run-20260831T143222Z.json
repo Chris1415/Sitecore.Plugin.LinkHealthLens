@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T09:40:00Z",
+  "updated_at": "2026-09-01T10:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -190,7 +190,8 @@
     "ship_report": null,
     "friction_log": null,
     "status_index": "products/marketplace/link-health-lens/project-planning/STATUS.md",
-    "probe_findings": "products/marketplace/link-health-lens/project-planning/plans/probe-findings-t008-20260901T090000Z.md"
+    "probe_findings": "products/marketplace/link-health-lens/project-planning/plans/probe-findings-t008-20260901T090000Z.md",
+    "host_frame_feasibility": "products/marketplace/link-health-lens/project-planning/plans/host-frame-feasibility-20260901.md"
   },
   "// canonical_artifacts — schema-7 deltas": [
     "implementation_runbook REMOVED in schema 7. The task breakdown's § 0 (Quick orientation) now carries target directory + canonical inputs + delivery order. Reading a schema-6 manifest? Treat any present implementation_runbook entry as legacy/archived; do not produce new ones.",
@@ -402,6 +403,12 @@
       "verified_independently": "tests 16/16 · lint 0 errors (2 warnings) · verify-poc.mjs 35/35 · comment-density exit 0",
       "not_done": "pixel capture-and-compare against poc-v1-prd000 at 320/360/400 in the real Cloud Portal host frame",
       "not_done_reason": "Mode A has no mock-client path. Confirmed concretely rather than assumed: a throwaway local preview route rendered BLANK because MarketplaceProvider gates the whole tree until a real portal handshake resolves. Flagged in build-decisions.md and the task breakdown rather than silently marked passed."
+    },
+    "TR-1-code-review": {
+      "outcome": "clean",
+      "findings": "1 Critical (fixed), 0 Major, 1 Minor (fixed)",
+      "critical": "The T006 probe harness — which reads live CM data — was still on disk and reachable from the production /pages-context route via a live link, while docs/build-decisions.md claimed it had already been deleted. Deleted both directories and the link; the false paragraph was corrected IN PLACE rather than silently rewritten.",
+      "gates_reverified_by_orchestrator": "probe dirs gone, 0 links, 0 residual imports, 17/17 tests, lint 0 errors, verify-poc 35/35, comment-density exit 0"
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -683,6 +690,13 @@
       "severity": "info",
       "item": "CORRECTION: OQ-A ('Blok publishes no warning semantic role') is FALSE — six --warning-* tokens exist in the installed theme. Recorded because the claim reached the operator twice as fact. Separately, a genuine Blok defect was found: --primary-foreground (primary-600) on --primary (primary-500) measures 1.48:1 and fails AA. Worth an upstream report.",
       "status": "resolved"
+    },
+    {
+      "stage": "test",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] Host-frame visual pass: choose the cadence for all six tranche exits. (a) Opt into Playwright storageState reuse — one interactive login, then every tranche exit automates; the cost is an on-disk file holding a live Cloud Portal session until it expires. (b) Batch one interactive visual pass at the build gate — no policy change, no stored session, but a visual regression in TR-2 would not surface until TR-6. EITHER WAY the Cloud Portal Pages canvas deep-link URL for a devex-tenant page is required and has not been supplied.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -760,7 +774,9 @@
     "probe_d_design_wins": "Two things pages.context delivers that the plan did not know it had. (1) siteInfo.rootPath arrives with the context on every page selection, so ADR-0009 needs NO separate sites call to know the site root. (2) pageInfo.presentationDetails carries the full rendering list as JSON, each entry with { id, instanceId, placeholderKey, dataSource, parameters } — an attribution source far stronger than inferring from rendered HTML. It maps a REGION of the page to the ITEM backing it, which is most of the distance to an honest 'this link lives in X' affordance.",
     "getvalue_not_implemented": "client.getValue() throws 'CoreError: [client SDK] getValue method is not implemented.' in 0.3.6. Irrelevant to this app (context panel, not custom field) but it means the custom-field read/write surface documented in the client skill does not exist in this SDK version.",
     "oq_a_CORRECTED": "OQ-A was FALSE. Blok DOES publish a warning semantic role — six tokens verified in the installed theme: --warning, --warning-hover, --warning-active, --warning-background, --warning-background-active, --warning-foreground. The claim originated in the v1 UI Designer's report, was recorded as an open question at the design gate, and was relayed to the operator twice without being checked against the installed package. No build impact (severity rides on glyph + text chip + rail, which is right for a narrow panel regardless), but the design open question rested on a false premise.",
-    "blok_contrast_defect": "REAL DEFECT IN BLOK'S SHIPPED THEME, not a variant choice: --primary-foreground resolves to var(--color-primary-600) while --primary resolves to var(--color-primary-500) — two adjacent steps of the same ramp, measured at 1.48:1, failing AA badly in light mode. Worked around locally by substituting --background for the one POC rule using that pairing, which matches the pattern Blok's own Button already uses internally. Worth reporting upstream to the Blok team; it affects every consumer who pairs those two tokens as their names invite."
+    "blok_contrast_defect": "REAL DEFECT IN BLOK'S SHIPPED THEME, not a variant choice: --primary-foreground resolves to var(--color-primary-600) while --primary resolves to var(--color-primary-500) — two adjacent steps of the same ramp, measured at 1.48:1, failing AA badly in light mode. Worked around locally by substituting --background for the one POC rule using that pairing, which matches the pattern Blok's own Button already uses internally. Worth reporting upstream to the Blok team; it affects every consumer who pairs those two tokens as their names invite.",
+    "host_frame_verdict": "AUTOMATABLE ONLY AFTER AN OPERATOR OPT-IN. Cloud Portal enforces an Auth0 identifier-first login wall; a fresh Playwright session has zero usable cookies (verified by driving a real Node/Playwright script — portal.sitecorecloud.io 302s to auth.sitecorecloud.io). Playwright storageState reuse would work after ONE interactive login, but marketplace-sdk-host-frame-testing's own contract forbids persisting sessions without asking, so this is an operator decision, not a tooling gap. Separately, the Cloud Portal Pages canvas deep-link URL for a devex page is a MISSING MANDATORY INPUT for any real host-frame pass, under either option.",
+    "critical_pattern_again": "The TR-1 Critical is the same shape as F38 and as this run's earlier findings: docs/build-decisions.md asserted the harness had been deleted, nothing gated that claim, and it was false. A status claim in prose has no gate. It was only caught because the reviewer was told to flag the harness IF IT LEAKED into the production path — a blanket 'ignore it, it is throwaway' would have missed it."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
