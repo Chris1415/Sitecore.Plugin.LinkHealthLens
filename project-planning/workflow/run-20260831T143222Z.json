@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T15:30:00Z",
+  "updated_at": "2026-09-01T15:50:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -457,6 +457,17 @@
       "finding": "tsc --noEmit had been FAILING since TR-2 on a test fixture missing resourceId/tenantId from ApplicationResourceContext. TR-4's Developer found it, correctly identified it as pre-existing and left it as out of scope. The orchestrator verified the pre-existing claim by running tsc at commit bf44dab in a throwaway worktree — identical error, so the claim was honest.",
       "why_it_survived": "next build does not traverse test files, so a green build hid a red typecheck. AND TR-3's report explicitly claimed 'tsc --noEmit clean' — a false status claim in prose that nothing gated. Same pattern as the TR-1 Critical, where docs/build-decisions.md claimed the probe harness was deleted while it was still reachable.",
       "fix": "Fixture reshaped from the REAL captured application.context, with a comment naming why it went unnoticed. tsc now clean."
+    },
+    "T019-live-reconciliation": {
+      "outcome": "PASS — closed",
+      "evidence": "The live panel on Velaro Home reported 17 links. The orchestrator independently computed the expected count from the CM BEFORE the operator looked: 17 anchors total, 17 with an href, 0 without, 16 distinct, 16 relative, 0 absolute, 1 in-page anchor. Exact match. The extractor finds every anchor on a real page, verified against a source it did not produce.",
+      "closes": "T019's live-canvas leg, outstanding since TR-2 because Mode A has no mock-client path."
+    },
+    "case-sensitivity-probe": {
+      "outcome": "verified non-issue",
+      "trigger": "The live panel showed BOTH /Models (#6) and /models (#8) on one page — same target, different case. If the AGQL path lookup were case-sensitive, /models would report as target-not-found: a false finding on a good link, on the very page used for smoke.",
+      "result": "AGQL path lookup is CASE-INSENSITIVE — /Models, /models and /MODELS all HIT the same item. Tested on devrel, all three forms. No normalisation needed for case, and TR-4 needs no change.",
+      "why_recorded": "Sitecore resolves paths case-insensitively but the GraphQL layer did not have to agree. A prior framework defect had exactly this shape — audit-sitecore-schema.mjs matched paths case-sensitively and went blind to an entire brand. Tested rather than assumed."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -882,7 +893,8 @@
     "mutation_discipline": "Any mutation harness must prove the mutation landed before trusting the result. This run has now hit that trap once, in the orchestrator's own verification, having already recorded it from the koven Gate-3 run. Knowing the trap did not prevent walking into it; asserting the mutation did.",
     "framework_finding_candidate_6": "Sixth instance of the F38 pattern, and the sharpest: a probe verified the API contract out-of-band and a type gate verified the signature, both green, while the actual in-app call path was never exercised and failed on first contact. Worth filing beside F38 — the counter-move is not another gate but running the thing THROUGH THE PATH THAT SHIPS.",
     "tr4_flag_for_T048": "xmc.authoring.graphql and xmc.live.graphql are declared under MutationMap in the SDK despite being read-only GraphQL queries. T048's prohibition gate ('no client.mutate beyond the T037 canvas call') must treat these two as legitimate exceptions, or it will fail a correct build.",
-    "tr4_open_shape": "getLivePageState's 404 throw-vs-return runtime shape is unverified in-app — T007's capture was raw out-of-band REST, not a client.query() result. Both shapes are unit-tested. Low risk because it is the FALLBACK path only and the live-Edge lead is tried first, but it is unproven until the real-tenant smoke."
+    "tr4_open_shape": "getLivePageState's 404 throw-vs-return runtime shape is unverified in-app — T007's capture was raw out-of-band REST, not a client.query() result. Both shapes are unit-tested. Low risk because it is the FALLBACK path only and the live-Edge lead is tried first, but it is unproven until the real-tenant smoke.",
+    "panel_state_for_operator": "The live panel currently renders TR-2's RAW list with the provisional '17 links found' verdict. That is correct for this point in the build: TR-4 COMPUTES resolution, TR-6 RENDERS it. Absence of status chips is not a defect. Confirmation that TR-4 ran is the console line '[link-health-lens] scan complete: ...' with M1 timings."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
