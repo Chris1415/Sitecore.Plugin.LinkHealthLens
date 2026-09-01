@@ -570,3 +570,69 @@ header+nav+footer links and matching the escalation's own manual tally — no or
 This is one page on one tenant; T033/T034's "table over >=5 named pages" real-tenant step is still
 outstanding (unchanged from T032's note above) and M3 should be re-measured there before treating 100%
 as representative.
+
+## TR-6 (T041–T048)
+
+**T042 — the count rail moved OUT of the `aria-live` region, correcting the POC's own structure.**
+`panel.js` § `renderHead` places the rail's markup textually inside the same `aria-live="polite"` wrapper
+as the verdict sentence (string concatenation, not a semantic choice the POC's own comments defend).
+Re-announcing a whole chip rail on every scan is noisy for a screen-reader user and the PRD never asks
+for it. `VerdictHead.tsx` is split into `VerdictSentence` (sentence + sub-line, placed in `PanelShell`'s
+`verdict` slot, which IS wrapped in `aria-live`) and `CountRail` (placed in `headExtra`, outside it) —
+`Panel.test.tsx` asserts the rail is absent from the live region as a named regression. This is a
+deliberate, documented divergence from the POC's DOM shape, not from any ADR or verbatim string.
+
+**T044 — the runtime contrast assertion does not trust jsdom's `getComputedStyle`.** The QA-added test
+(§ 10) needs the ACTUAL resolved chip contrast (`foreground` on `muted`), not just a class-name
+assertion. jsdom does not reliably resolve Tailwind v4's `@theme`-nested `var()` chains (`--foreground`
+-> `--color-blackAlpha-900` -> a literal rgba, several indirections deep) the way a real browser's
+cascade does, so trusting `getComputedStyle` here would risk a false pass. Instead the test computes the
+WCAG ratio directly from the SAME literal token values T010 already measured off the real
+`app/globals.css` (`--color-gray-50`/`--color-gray-900` for `muted`, `--color-blackAlpha-900`/white for
+`foreground`) — light 19.1:1-class, dark >20:1-class, both far clear of the 4.5:1 floor (T010's own
+`muted-foreground`-on-`muted` reading of 4.69:1/8.12:1 is the tighter pairing; `foreground` is always
+higher-contrast than `muted-foreground` against the same background, so this pairing was never at risk —
+the test exists to prove that, not to discover a surprise).
+
+**T045 — disclosure reset via "adjust state during render", not a `useEffect`.** The first cut reset
+`openGroups` inside a `useEffect` keyed on `findings`. ESLint's `react-hooks/set-state-in-effect` (rule
+60, hard `error` in this repo's config) rejected it: calling `setState` synchronously in an effect body
+causes a cascading extra render. Fixed per the React docs' "adjusting state when a prop changes" pattern
+— a `prevFindings` state slot compared against the incoming `findings` prop *during* render, updating
+both together before the render commits, with no effect at all. Recorded because the rejection came from
+a real lint gate, not a style preference: the effect-based version passed every unit test and still
+failed `npm run lint`.
+
+**T047 — `verify-app-parity.test.tsx` deliberately overlaps existing per-component tests.** Several of
+its 12 assertions restate something `groups.test.ts` / `GroupList.test.tsx` / `OriginAffordance.test.tsx`
+/ `wordBan.test.ts` / `no-emoji.test.tsx` already cover in isolation. This is intentional, not
+duplication for its own sake: `verify-poc.mjs`'s own shape is ONE assembled surface with MANY
+assertions, and the port is only faithful if it re-asserts over the assembled `Panel` component too —
+composition bugs (a prop not threaded through, a wrong slot) are exactly the class of defect isolated
+unit tests cannot see.
+
+**T048 — FR-19's naive gate is WRONG, and the run brief's warning was necessary, not decorative.** A
+first-cut gate asserting `client.mutate` appears in exactly one file (`JumpAction.tsx`) failed
+immediately against real source: `resolveItemByPath.ts` (`xmc.authoring.graphql`) and
+`checkLiveViaEdge.ts` (`xmc.live.graphql`) both call `client.mutate(...)` too, because the SDK mis-types
+these two read-only GraphQL passthroughs as mutations (`marketplace-sdk-xmc` § 6c — the exact defect
+class two sibling apps shipped wrong, per the TR-4 build-decisions entry above). The gate now pins the
+full three-file, three-key allowed set (`JumpAction.tsx` -> `pages.context`, `resolveItemByPath.ts` ->
+`xmc.authoring.graphql`, `checkLiveViaEdge.ts` -> `xmc.live.graphql`) and fails on anything beyond it —
+still zero-tolerance for a FOURTH call site, but no longer blind to the two legitimate ones.
+
+**T048 — M5's whole-tree scan produced two classes of false positive, both fixed by scoping to shipped
+UI copy rather than the whole source tree.** (1) `components/ui/error-states.tsx` (Blok-vendored,
+generated, and per T009's build-decisions entry never wired into any rendered state) carries generic
+default copy containing the literal word "404" — excluded by scoping the gate to `.tsx` files outside
+`components/ui/` plus `lib/panel/copy.ts` specifically, the same "generated infrastructure is exempt"
+principle rule 86's authorability audit already applies to scaffold wrappers. (2) `lib/sdk/
+getLivePageState.ts` (a `.ts` SDK module, never rendered) legitimately names a literal HTTP `404` in a
+`.d.ts`-citing comment and a `console.error` diagnostic (ADR-0008) — excluded because SDK-layer `.ts`
+files are never UI copy by construction (nothing in `lib/sdk/` renders), which is the literal reading of
+the run brief's "the word ban applies to UI copy, not to code identifiers."
+
+**`RawAnchorList` is dead code as of this tranche** — `app/pages-context/page.tsx` now renders `Panel`
+for the ready state, not `RawAnchorList` directly. Left in place (with its own passing test) rather than
+deleted: it is TR-2's real T1-exit evidence (the raw anchor list rendering in the canvas before any
+classification existed), and removing it would erase that record for no functional gain.
