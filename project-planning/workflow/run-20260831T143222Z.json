@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-08-31T18:10:00Z",
+  "updated_at": "2026-09-01T08:40:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -334,7 +334,7 @@
     "status": "not_started",
     "resumed_from_stage": null
   },
-  "next_action": "BLOCKED before /implement: T001 is a hard stop — App Studio registration for 'Link Health Lens' on the devex tenant, a named known-bad page AND a named known-good control page, and a CM credential. Every tranche exit is real-tenant-bound and T0 is blocking.",
+  "next_action": "run /implement scoped to TR-0 — the blocking probe tranche, runs first and alone",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -523,6 +523,34 @@
       "severity": "warn",
       "item": "QA marked AC-7.1 'manual-only pending probe' and AC-7.4 'deferred pending probe (g)' rather than covered, and AC-3.3 / AC-6.1-6.4 conditional on the probe (a)/(b) verdicts. That is the honest posture: a test proving item-level navigation would have recorded a false green on a headline feature. It also means section 10a's coverage map is deliberately incomplete until T0 returns.",
       "status": "open"
+    },
+    {
+      "stage": "task-breakdown",
+      "type": "concern",
+      "severity": "info",
+      "item": "The app is registered in devrel and SHARED into devex. Every out-of-band CM read/write for this run must therefore use the DEVEX credential and assert tenant developerex211b-hahnsolo3097-cm7744 — pointing the out-of-band half at devrel while the app runs on devex would create smoke pages the app never sees, and T0 would report 'nothing found', which is indistinguishable from a working checker on a clean page.",
+      "status": "open"
+    },
+    {
+      "stage": "task-breakdown",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] RESOLVED IN PART — registration and credential are now settled. Still outstanding for T0: a NAMED known-bad page and a NAMED known-good control page on the devex tenant. M4 requires zero findings on the control, so it is load-bearing: without it a sweep that reports findings everywhere is a claim about the checker, not the content.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "assumption",
+      "severity": "warn",
+      "item": "The known-good control (Koven Home) is a PROXY: small link surface, not verified clean. Certifying it clean would require running the checker on it, which is circular. Its cleanliness is established at the TR-3 exit, and a non-clean result moves the control rather than relaxing M4.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "assumption",
+      "severity": "warn",
+      "item": "Zephira's documented defects (rule 85) are ROUTE-PATH divergences observed on the LIVE surface. This app checks CM-side state via path-by-url + getLivePageState, so those specific defects may be invisible to it. If T0/TR-3 finds nothing on the known-bad page, that is not evidence the checker works — fall back to Velaro Home for anchor volume and find a genuine CM-side defect.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -585,7 +613,11 @@
     "design_poc_gate_script": "poc-v1-prd000/verify-poc.mjs is a 35-assertion gate that walks every reachable state and fails on a dangling href. It found the build's one real navigation defect. Run it at every tranche exit, not once at design close — a frame that stops honouring an ADR fails it.",
     "qa_report_decision": "null — minimal track, the enriched task breakdown IS the test contract. No standalone qa-report.md requested.",
     "plan_shape": "48 tasks (T001-T048), 7 tranches, surface-sliced per the pack's tranche_shape_tiebreak: one extension point would have collapsed the build into a single tranche and defeated the delivery loop. Concurrent sets: none, with evidence against all five rule-71 checks — a pending blocking probe disqualifies concurrency outright (check 1).",
-    "scaffold_inside_probe": "The scaffold sits INSIDE TR-0 deliberately: Mode A has no mock-client path, so a registered app framed by the real portal is the probe's only instrument. Built once; TR-1 continues from it."
+    "scaffold_inside_probe": "The scaffold sits INSIDE TR-0 deliberately: Mode A has no mock-client path, so a registered app framed by the real portal is the probe's only instrument. Built once; TR-1 continues from it.",
+    "estate_resolution": "App Studio registration lives in the Sitecore Dev Relations org (devrel) and the app is SHARED into devex, where it is confirmed working. A custom Marketplace app can be shared across organisations, so registration org and install org are NOT locked together — my initial reading that they were was wrong. Run target is devex: tenant developerex211b-hahnsolo3097-cm7744, credential SITECORE_CM_CLIENT_ID_DEVEX/_SECRET_DEVEX, both verified minting 2026-09-01 with the token's own org_name/tenant claims asserted.",
+    "credential_provenance": "No new automation client was created. Both devex and devrel pairs already existed in products/head-application/hahn-solo/cm/.env and both mint successfully; each asserts a different tenant, which is what makes the pairing checkable rather than assumed.",
+    "smoke_page_rationale": "Known-bad = Zephira Home: the one brand with DOCUMENTED link defects (2026-08-11, four links 404'd for real visitors while a prod-route smoke asserted the broken URL form and passed for days — the evidence behind rule 85). Known-good control = Koven Home: a single child (Data), no subpage tree, so the smallest link surface in the estate. Velaro Home was the alternative known-bad — five real subpages, the busiest anchor count, better for stressing the 150-anchor budget — and remains the fallback if Zephira's defects turn out to be live-route-only and invisible to a CM-side check.",
+    "control_page_policy": "If the control returns findings at the TR-3 exit, MOVE THE CONTROL — do not weaken M4. M4 (zero findings on a known-good page) is the run's only anti-false-positive gate; a sweep that reports findings everywhere is a claim about the checker, not the content. QA already flagged this as a check that must not become unfailable."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
@@ -599,5 +631,32 @@
         "registered": false
       }
     ]
+  },
+  "provisioning": {
+    "cm_tenant": "developerex211b-hahnsolo3097-cm7744",
+    "cm_org": "devex",
+    "cm_host": "https://xmc-developerex211b-hahnsolo3097-cm7744.sitecorecloud.io",
+    "app_registered": true,
+    "app_registration_org": "Sitecore Dev Relations (devrel)",
+    "app_shared_with": [
+      "devex"
+    ],
+    "extension_point": "xmc:pages:contextpanel",
+    "route_url": "/pages-context",
+    "display_name": "Link Health",
+    "deployment_url": "http://localhost:3000",
+    "api_access": [
+      "SitecoreAI APIs",
+      "AI skills APIs"
+    ],
+    "permissions": [
+      "pop-ups",
+      "copy to clipboard",
+      "read from clipboard",
+      "download files"
+    ],
+    "smoke_page_known_bad": "/sitecore/content/Zephira-Brand/Zephira/Home",
+    "smoke_page_known_good_control": "/sitecore/content/Koven-Brand/Koven/Home",
+    "smoke_pages_provenance": "Proposed by the orchestrator from a read-only enumeration of the devex tenant, and the choice was DELEGATED by the operator ('go with what you think is fine'). Recorded this way deliberately: T001 forbids inventing a page, and delegated-with-reasoning is not the same as invented, but it is also not the same as operator-named. If either page proves unsuitable the pick moves — it is not a fact about the estate."
   }
 }
