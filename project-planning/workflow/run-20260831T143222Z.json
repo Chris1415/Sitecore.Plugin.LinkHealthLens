@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T13:20:00Z",
+  "updated_at": "2026-09-01T13:45:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "/code-review on the TR-2 diff, then TR-3 (host list + scope + string checks).",
+  "next_action": "TR-3 — host list + scope + string checks (T021-T027).",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -416,6 +416,12 @@
       "not_done": "T019's live-canvas independent DOM query, and T020's pixel compare",
       "not_done_reason": "Mode A has no mock-client path. Same treatment as TR-1's T014 — recorded, not claimed. The pixel compare is batched to the build gate by operator decision.",
       "anchor_count_reconciled": "The extractor reports 59 anchors on the real Zephira Home fixture; the orchestrator's earlier regex measurement said 57. Both are right: 57 anchors carry an href, 2 carry none. The regex required href= and missed them. The DOMParser found them and gives each its own row rather than dropping it, which is what TR-3 needs to classify an empty or missing href. The extractor is MORE accurate than the number it was checked against."
+    },
+    "TR-2-code-review": {
+      "outcome": "clean",
+      "findings": "0 Critical, 0 Major, 0 Minor — no code changes needed",
+      "orchestrator_verification": "A zero-finding review is itself a claim, so the two load-bearing ones were checked by EXECUTION. (1) Double unwrap: mutating pagesGetPageHtml.ts to a single unwrap makes 2 tests FAIL, including one named for the regression; restoring returns 37/37. (2) Independent DOM query: reconcileAnchors.test.ts builds its own list with querySelectorAll + getAttribute, separate from extractAnchors.ts — genuinely independent, not the extractor compared to itself.",
+      "orchestrator_error_recorded": "My FIRST mutation attempt silently did not apply — a bash-style path was passed to Python, which could not open it — and the suite then printed 37/37. That green result proved nothing. This is the Gate-3 trap verbatim: a mutation that fails to apply is indistinguishable from a mutant that survives, and both render as a green run. The second attempt ASSERTED the file changed before running anything."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -816,7 +822,8 @@
     "canvas_url_pending": "The Cloud Portal Pages canvas deep-link URL for a devex-tenant page is a mandatory input for the build-gate visual pass. The operator will supply it. It is NOT needed for TR-2..TR-6 implementation, so it does not block the build.",
     "probe_findings_reverified_on_devrel": "All load-bearing findings re-measured against devrel and IDENTICAL to devex: 0 of 7 sites carry a targetHostname; pagesGetPageHtml returns 200 {pageId, html}; Zephira Home has 57 anchors / 20 distinct / 56 relative / 0 absolute; landmarks header 6, nav 4, footer 4, main 49; no data-* structural hints; path-by-url 404s with 'No matching site found for hostname'. ADR-0009, ADR-0006 and ADR-0010 therefore stand on evidence from the tenant the app actually runs in. Devrel capture saved as captures/agent-page-html-zephira-home.DEVREL.json.",
     "tr2_m2_control": "The M2 reconciliation harness compares the extractor against an INDEPENDENTLY implemented DOM query, not against its own output, and ships a working self-test control proving the comparison can fail. That is the anti-circularity requirement QA set at task-breakdown time, honoured rather than approximated.",
-    "tr2_language_guard": "usePageScan guards the case where no language is available on pageInfo or siteInfo, instead of defaulting to 'en'. Modelled as health.pageHtml=false plus an error state, because PageScan.health has no dedicated member. The Developer flagged this as a READING of the contract rather than a gap — QA may want it named distinctly at /test."
+    "tr2_language_guard": "usePageScan guards the case where no language is available on pageInfo or siteInfo, instead of defaulting to 'en'. Modelled as health.pageHtml=false plus an error state, because PageScan.health has no dedicated member. The Developer flagged this as a READING of the contract rather than a gap — QA may want it named distinctly at /test.",
+    "mutation_discipline": "Any mutation harness must prove the mutation landed before trusting the result. This run has now hit that trap once, in the orchestrator's own verification, having already recorded it from the koven Gate-3 run. Knowing the trap did not prevent walking into it; asserting the mutation did."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
