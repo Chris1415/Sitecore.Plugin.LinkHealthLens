@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T16:20:00Z",
+  "updated_at": "2026-09-01T17:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -56,7 +56,7 @@
   "variables": {
     "mode": "client-side"
   },
-  "status": "in_progress",
+  "status": "build_ready",
   "// work_item_type — schema 8 discriminator": [
     "work_item_type is the keystone discriminator set at intake by /create-prd (prd), /create-frd (frd), or /create-bug (bug). Every downstream command reads it to pick the weight-preset, the operator-gate count (prd=2, frd=1, bug=0+valves), and which stages to skip (bug skips architect+UI; frd skips architect+UI unless an ADR-worthy decision or UI scope exists).",
     "SAME ARTIFACT SLOTS, DIFFERENT FILL. canonical_artifacts.prd / prd_minimal hold the SPEC and SPEC-MINIMAL regardless of type — for an FRD they point at frd-NNN.md / frd-minimal-NNN.md; for a bug at bug-NNN.md / bug-minimal-NNN.md. The slot names stay `prd` / `prd_minimal` so downstream read paths (esp. Developer-08's `prd_minimal + task_breakdown`) are unchanged. The misnomer is intentional and documented.",
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "Restart the dev server and re-open the panel — internal links should now carry resolved statuses. Then TR-5.",
+  "next_action": "BUILD GATE — the operator's single visual pass against poc-v1-prd000 at 320/360/400. Then /code-review over TR-5+TR-6, then /test over the whole build, then /ship.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -480,6 +480,18 @@
       "cause": "A DEPTH bug, not a design failure. attribute() correlates main.children against the presentationDetails entries and refuses on a count mismatch. The real DOM is <main id=main><div id=content><section>x5 — so main.children is 1 (a wrapper) while there are 5 renderings. Measured directly: 5 top-level <section> children of #content vs 5 renderings, an EXACT match one level deeper.",
       "why_it_was_invisible": "The Developer flagged honestly that no fixture paired a captured presentationDetails with its own page's HTML, so attribution was unit-tested but unverified against real data. The orchestrator built that pair from the operator's in-portal probe blob plus a fresh HTML capture, and the defect appeared on the first real measurement.",
       "fixtures_now_durable": "captures/agent-page-html-velaro-home.DEVREL.json + captures/velaro-home-presentation-details.DEVREL.json — the pair that was missing. Tier-1 tracked."
+    },
+    "TR-6-exit": {
+      "outcome": "pass",
+      "verified_independently": "tsc clean · 246/246 tests (44 files) · lint 0 errors · verify-poc 35/35 POC unmodified · comment-density exit 0",
+      "delivered": "Verdict sentence + worst-first count rail, permanent scope strip with disclosure, up to 8 collapsible severity groups, row anatomy carrying the full status SET, and the three mutually-exclusive origin affordances. RawAnchorList's placeholder is gone."
+    },
+    "T048-prohibition-gates": {
+      "outcome": "all four MUTATION-PROVEN to fail",
+      "method": "The orchestrator planted a canary violating each prohibition and confirmed the gate failed, then removed it and confirmed green. Reading the gates was not accepted as evidence — this run has found FIVE gates that could not fail, one of them in this codebase.",
+      "results": "FR-18 (fetch to a link target) FAILED correctly · FR-19 (a 4th client.mutate) FAILED correctly · NFR-3 (localStorage.setItem) FAILED correctly · M5 (a banned word planted in a REAL UI label) FAILED correctly.",
+      "scoping_confirmed": "M5 correctly IGNORED banned words in a plain source string and fired only on shipped UI copy. That distinction is required, not incidental: TR-4 legitimately handles literal 404s in getLivePageState code.",
+      "fr19_exemptions_held": "The gate pins the exact three allowed call sites rather than asserting zero mutations — JumpAction.tsx/pages.context, resolveItemByPath.ts/xmc.authoring.graphql, checkLiveViaEdge.ts/xmc.live.graphql. TR-4 flagged the two SDK mis-typed reads two tranches earlier, so a naive zero-mutation gate never shipped."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -824,6 +836,13 @@
       "severity": "warn",
       "item": "M3 measured 0% against real data on first measurement — below A3's 50% threshold. Diagnosed as a depth bug (the correlation anchors at <main>, whose only child is a wrapper; the renderings are its grandchildren, 5 vs 5 exactly) and a bounded fix is in progress. If the fix does NOT bring M3 above 50%, that becomes a genuine A3/UX re-decision for you rather than a bug — the spec pre-committed that below ~50% the feature reads as broken rather than partial.",
       "status": "open"
+    },
+    {
+      "stage": "test",
+      "type": "decision",
+      "severity": "warn",
+      "item": "BUILD GATE — your single visual pass, the one you batched. Restart the dev server (app/pages-context/page.tsx changed its import graph and Turbopack does not reliably hot-reload a removed top-level import), open the canvas URL, and compare the panel against poc-v1-prd000 at 320/360/400. The state-to-frame checklist is in notes.build_gate_checklist so it is a checklist rather than a hunt. ONE intended divergence: the Open-in-canvas label differs from the POC, because ADR-0010 replaced the jump-to-field affordance the POC was drawn against.",
+      "status": "open"
     }
   ],
   "// operator_attention — guidance": [
@@ -915,7 +934,9 @@
     "tr4_open_shape": "getLivePageState's 404 throw-vs-return runtime shape is unverified in-app — T007's capture was raw out-of-band REST, not a client.query() result. Both shapes are unit-tested. Low risk because it is the FALLBACK path only and the live-Edge lead is tried first, but it is unproven until the real-tenant smoke.",
     "panel_state_for_operator": "The live panel currently renders TR-2's RAW list with the provisional '17 links found' verdict. That is correct for this point in the build: TR-4 COMPUTES resolution, TR-6 RENDERS it. Absence of status chips is not a defect. Confirmation that TR-4 ran is the console line '[link-health-lens] scan complete: ...' with M1 timings.",
     "m3_metric_earned_its_keep": "M3 was designed to be failable — ADR-0006 rejected an attribution-derived denominator precisely because it would have read 100% by construction. With the structural denominator it read 0% and pointed straight at the cause. Had the earlier design shipped, TR-6 would have built UI on top of an attribution rate that could never fail.",
-    "attribution_fix_constraints": "The fix must descend through single-child wrappers with a BOUNDED depth and keep the refusal rule. An unbounded search for any node whose child count matches would find coincidental matches — reintroducing exactly the guessing the refusal exists to prevent. It must not hard-code #content or any class name: that is this head app's markup, not a contract."
+    "attribution_fix_constraints": "The fix must descend through single-child wrappers with a BOUNDED depth and keep the refusal rule. An unbounded search for any node whose child count matches would find coincidental matches — reintroducing exactly the guessing the refusal exists to prevent. It must not hard-code #content or any class name: that is this head app's markup, not a contract.",
+    "tr6_two_real_bugs_caught": "The Developer reported two defects it hit rather than avoided by luck: a useEffect-based disclosure reset rejected by react-hooks/set-state-in-effect (a hard lint error, fixed with adjust-state-during-render), and a first-cut zero-client.mutate gate that failed immediately against real source. The second is the exact defect the brief warned about, caught by running the gate rather than reasoning about it.",
+    "build_gate_checklist": "Panel state -> POC frame: default view -> index.html · each group -> group-<id>-{closed,open}.html · scope disclosure -> state-scope-open.html · after Open in canvas -> state-jumped-r1.html (label text intentionally DIFFERS from the POC per ADR-0010) · loading/error/no-links/clean/chrome-only -> the matching state-*.html · widths -> state-width-320.html / state-width-400.html."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
