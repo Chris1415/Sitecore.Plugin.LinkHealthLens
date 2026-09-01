@@ -7,6 +7,7 @@ import type { PagesContext } from "@sitecore-marketplace-sdk/client";
 import { useEffect, useRef, useState } from "react";
 import { useMarketplaceClient } from "@/components/providers/marketplace";
 import { extractAnchors } from "@/lib/scan/extractAnchors";
+import { classifyFindings } from "@/lib/scan/classifyFindings";
 import { fetchPageHtml } from "@/lib/sdk/pagesGetPageHtml";
 import { freshHealth, type PageScan } from "@/lib/model/types";
 
@@ -77,7 +78,10 @@ export function usePageScan(): UsePageScanResult {
         return;
       }
 
-      const findings = extractAnchors(result.html);
+      // TR-3: scope + string checks + in-page anchor check run over every
+      // seed finding as soon as the page HTML is in hand — the same html
+      // that answered extraction also answers the anchor check.
+      const findings = classifyFindings(extractAnchors(result.html), result.html);
       setScan({
         page: { ...page, language: page.language },
         findings,
