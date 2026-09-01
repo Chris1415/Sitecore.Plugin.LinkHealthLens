@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-01T10:30:00Z",
+  "updated_at": "2026-09-01T11:00:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "/code-review on the TR-1 diff, then /test. TR-1's pixel-capture leg needs one operator-driven host-frame pass before the tranche fully closes.",
+  "next_action": "TR-2 (extraction). The visual leg is batched to ONE interactive pass at the build gate; the operator supplies the Pages canvas deep-link URL then.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -697,6 +697,27 @@
       "severity": "blocker",
       "item": "[BLOCKER] Host-frame visual pass: choose the cadence for all six tranche exits. (a) Opt into Playwright storageState reuse — one interactive login, then every tranche exit automates; the cost is an on-disk file holding a live Cloud Portal session until it expires. (b) Batch one interactive visual pass at the build gate — no policy change, no stored session, but a visual regression in TR-2 would not surface until TR-6. EITHER WAY the Cloud Portal Pages canvas deep-link URL for a devex-tenant page is required and has not been supplied.",
       "status": "open"
+    },
+    {
+      "stage": "test",
+      "type": "decision",
+      "severity": "info",
+      "item": "RESOLVED — visual cadence is ONE batched pass at the build gate. No stored portal session. Each tranche still runs every automatable gate; only the POC pixel comparison batches. The canvas deep-link URL is supplied by the operator at that gate.",
+      "status": "resolved"
+    },
+    {
+      "stage": "test",
+      "type": "concern",
+      "severity": "warn",
+      "item": "Consequence of batching, recorded so it is a known trade rather than a surprise: TR-1's own pixel leg is now also deferred to the build gate, so the POC visual contract is unverified from TR-1 through TR-6. T011 exists precisely because a behaviour-decomposed build can pass every DOM assertion with no CSS behind it. verify-poc.mjs (35 assertions) still runs per tranche and covers state reachability and dangling hrefs, but it checks the POC against ITSELF — it cannot see whether the APP matches the POC.",
+      "status": "open"
+    },
+    {
+      "stage": "implement",
+      "type": "concern",
+      "severity": "warn",
+      "item": "ORCHESTRATOR ERROR, corrected: I claimed the probe ran against devex and called it 'proven not assumed', using __Revision as the estate discriminator. The estates are clones and the item was unedited, so the match was expected under either hypothesis — a non-discriminator treated as proof. The canvas URL shows devrel. Every finding was re-verified against devrel and is identical, so no design conclusion changes, but the reasoning was unsound and is recorded rather than quietly fixed.",
+      "status": "resolved"
     }
   ],
   "// operator_attention — guidance": [
@@ -776,7 +797,10 @@
     "oq_a_CORRECTED": "OQ-A was FALSE. Blok DOES publish a warning semantic role — six tokens verified in the installed theme: --warning, --warning-hover, --warning-active, --warning-background, --warning-background-active, --warning-foreground. The claim originated in the v1 UI Designer's report, was recorded as an open question at the design gate, and was relayed to the operator twice without being checked against the installed package. No build impact (severity rides on glyph + text chip + rail, which is right for a narrow panel regardless), but the design open question rested on a false premise.",
     "blok_contrast_defect": "REAL DEFECT IN BLOK'S SHIPPED THEME, not a variant choice: --primary-foreground resolves to var(--color-primary-600) while --primary resolves to var(--color-primary-500) — two adjacent steps of the same ramp, measured at 1.48:1, failing AA badly in light mode. Worked around locally by substituting --background for the one POC rule using that pairing, which matches the pattern Blok's own Button already uses internally. Worth reporting upstream to the Blok team; it affects every consumer who pairs those two tokens as their names invite.",
     "host_frame_verdict": "AUTOMATABLE ONLY AFTER AN OPERATOR OPT-IN. Cloud Portal enforces an Auth0 identifier-first login wall; a fresh Playwright session has zero usable cookies (verified by driving a real Node/Playwright script — portal.sitecorecloud.io 302s to auth.sitecorecloud.io). Playwright storageState reuse would work after ONE interactive login, but marketplace-sdk-host-frame-testing's own contract forbids persisting sessions without asking, so this is an operator decision, not a tooling gap. Separately, the Cloud Portal Pages canvas deep-link URL for a devex page is a MISSING MANDATORY INPUT for any real host-frame pass, under either option.",
-    "critical_pattern_again": "The TR-1 Critical is the same shape as F38 and as this run's earlier findings: docs/build-decisions.md asserted the harness had been deleted, nothing gated that claim, and it was false. A status claim in prose has no gate. It was only caught because the reviewer was told to flag the harness IF IT LEAKED into the production path — a blanket 'ignore it, it is throwaway' would have missed it."
+    "critical_pattern_again": "The TR-1 Critical is the same shape as F38 and as this run's earlier findings: docs/build-decisions.md asserted the harness had been deleted, nothing gated that claim, and it was false. A status claim in prose has no gate. It was only caught because the reviewer was told to flag the harness IF IT LEAKED into the production path — a blanket 'ignore it, it is throwaway' would have missed it.",
+    "visual_cadence_DECIDED": "Operator chose: ONE batched interactive visual pass at the BUILD GATE, not per tranche. No Playwright storageState, no persisted Cloud Portal session, no change to marketplace-sdk-host-frame-testing's no-persisted-session contract. Accepted cost, stated so it is not rediscovered as a surprise: a visual regression introduced in TR-2 will not surface until the build gate. Every tranche exit still runs its AUTOMATABLE gates in full — suite, lint, build, verify-poc.mjs and the comment-density audit — so this defers only the pixel comparison against the POC, not the tranche exit as a whole.",
+    "canvas_url_pending": "The Cloud Portal Pages canvas deep-link URL for a devex-tenant page is a mandatory input for the build-gate visual pass. The operator will supply it. It is NOT needed for TR-2..TR-6 implementation, so it does not block the build.",
+    "probe_findings_reverified_on_devrel": "All load-bearing findings re-measured against devrel and IDENTICAL to devex: 0 of 7 sites carry a targetHostname; pagesGetPageHtml returns 200 {pageId, html}; Zephira Home has 57 anchors / 20 distinct / 56 relative / 0 absolute; landmarks header 6, nav 4, footer 4, main 49; no data-* structural hints; path-by-url 404s with 'No matching site found for hostname'. ADR-0009, ADR-0006 and ADR-0010 therefore stand on evidence from the tenant the app actually runs in. Devrel capture saved as captures/agent-page-html-zephira-home.DEVREL.json."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
@@ -822,6 +846,13 @@
     "xmcloud_tenant_id": "29eac3eb-6cbb-42a4-1a72-08ded696f4f5",
     "edge_context_preview": "51j9x7Prvy8OU2KYA0uEG6",
     "edge_context_live": "1Uv6PcB6s4UmosKCGiukko",
-    "estate_confirmed_by": "__Revision d19307bf-915b-4a2f-be9f-9ca1e1a80eb5 on Velaro/Home matched between the in-portal probe and out-of-band devex AGQL, along with updatedBy and the timestamp. A revision GUID regenerates on every edit, so two independently-edited estates cannot share one — unlike item GUIDs (identical by construction) or the display name ('Hahn-Solo / cm' on BOTH estates)."
+    "estate_confirmed_by": "__Revision d19307bf-915b-4a2f-be9f-9ca1e1a80eb5 on Velaro/Home matched between the in-portal probe and out-of-band devex AGQL, along with updatedBy and the timestamp. A revision GUID regenerates on every edit, so two independently-edited estates cannot share one — unlike item GUIDs (identical by construction) or the display name ('Hahn-Solo / cm' on BOTH estates).",
+    "canvas_url": "https://pages.sitecorecloud.io/editor?organization=org_ymNaHJXSK6ca26Gz&tenantName=sitecoresaa110c-hahnsoloff1c-cm386d&sc_site=Velaro&sc_itemid=ef14cc17-5a0b-4c15-aa2a-98749073b5db&sc_lang=en&sc_version=1",
+    "canvas_tenant": "devrel — sitecoresaa110c-hahnsoloff1c-cm386d",
+    "installed_in": [
+      "devrel (registered)",
+      "devex (shared)"
+    ],
+    "estate_claim_CORRECTED": "The earlier claim that the probe ran against devex was WRONG. __Revision was used as the discriminator, but the estates are CLONES and Velaro/Home was last edited 2026-07-31 — so an identical revision was the expected result under either hypothesis. A test that returns the same answer whether the claim is true or false cannot confirm it. The canvas URL is authoritative: the app runs in devrel."
   }
 }
