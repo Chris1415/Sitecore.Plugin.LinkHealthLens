@@ -60,9 +60,35 @@ describe("resolveItemByPath", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("returns ok:false, reason:'graphql-error' when the response carries a GraphQL errors array", async () => {
+  // REGRESSION (code review 2026-09-02): `errors` is a SIBLING of `data` in the
+  // GraphQL response body (Authoring.GraphqlResponses[200] in
+  // node_modules/@sitecore-marketplace-sdk/xmc/dist/xmc/src/client-authoring/
+  // types.gen.d.ts). The previous fixture nested it INSIDE `data`, which is the
+  // same misunderstanding the code held — so the branch was dead and a real
+  // GraphQL error surfaced to the editor as found:false ("target not found").
+  it("returns ok:false, reason:'graphql-error' when errors sit BESIDE data (the real wire shape)", async () => {
     const { stubClient, mutate } = createStubClient();
-    mutate.mockResolvedValueOnce({ data: { data: { errors: [{ message: "boom" }] } } } as never);
+    mutate.mockResolvedValueOnce({ data: { data: null, errors: [{ message: "boom" }] } } as never);
+
+    const result = await resolveItemByPath(stubClient, { path: PATH, language: "en", contextId: "ctx-1" });
+
+    expect(result).toEqual({ ok: false, reason: "graphql-error" });
+  });
+
+  it("an errors array beside a PARTIAL data payload still reports graphql-error, never found", async () => {
+    const { stubClient, mutate } = createStubClient();
+    mutate.mockResolvedValueOnce({
+      data: { data: { item: null }, errors: [{ message: "field access denied" }] },
+    } as never);
+
+    const result = await resolveItemByPath(stubClient, { path: PATH, language: "en", contextId: "ctx-1" });
+
+    expect(result).toEqual({ ok: false, reason: "graphql-error" });
+  });
+
+  it("an unrecognisable envelope is a failure, never a MISS — a missing body must not accuse the link", async () => {
+    const { stubClient, mutate } = createStubClient();
+    mutate.mockResolvedValueOnce({ data: undefined } as never);
 
     const result = await resolveItemByPath(stubClient, { path: PATH, language: "en", contextId: "ctx-1" });
 

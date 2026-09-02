@@ -10,12 +10,10 @@
 // error handler converting this into an infrastructure warning is "the
 // single most likely way to build this app wrong".
 //
-// Runtime throw-vs-return shape for a 404 was not captured in-app at T0 (the
-// T007 fixture is the raw out-of-band REST 404, not a client.query() result)
-// — both a resolved result carrying `status`/`error` and a thrown error
-// carrying `status` are handled here defensively; confirming which one the
-// real client.query() takes is an open item for the T034 real-tenant smoke
-// (docs/build-decisions.md).
+// The HTTP status is read off the hey-api envelope (`res.data.response.status`),
+// NOT off the QueryResult — `QueryResult.status` is a QueryStatus string, never
+// an HTTP code. An undeterminable status FAILS CLOSED to request-failed rather
+// than claiming "published": docs/build-decisions.md#live-page-state-http-status.
 import type { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
 export type GetLivePageStateResult =
@@ -30,6 +28,14 @@ function statusOf(value: unknown): number | undefined {
   const response = v.response as Record<string, unknown> | undefined;
   if (response && typeof response.status === "number") return response.status;
   return undefined;
+}
+
+/** HTTP status from a resolved `client.query` result: the hey-api envelope the
+ * XMC module returns sits at `res.data`; the QueryResult itself is checked only
+ * as a fallback for hosts that surface a numeric status one level up. */
+function httpStatusOf(res: unknown): number | undefined {
+  const envelope = (res as { data?: unknown } | undefined)?.data;
+  return statusOf(envelope) ?? statusOf(res);
 }
 
 export async function getLivePageState(
@@ -48,13 +54,28 @@ export async function getLivePageState(
         query: { language: params.language, sitecoreContextId: params.contextId },
       },
     });
-    const status = statusOf(res);
+    const status = httpStatusOf(res);
     if (status === 404) return { ok: true, live: false };
-    if (status !== undefined && status >= 400) {
-      console.error("getLivePageState: non-404 error status", { itemId: params.itemId, status });
-      return { ok: false, reason: "request-failed" };
+    if (status !== undefined) {
+      if (status >= 400) {
+        console.error("getLivePageState: non-404 error status", { itemId: params.itemId, status });
+        return { ok: false, reason: "request-failed" };
+      }
+      return { ok: true, live: true };
     }
-    return { ok: true, live: true };
+
+    // No HTTP status anywhere in the envelope. A missing status is NOT evidence
+    // of a live page — the only positive signal left is an actual payload with
+    // no error beside it; anything else fails closed to request-failed, which
+    // resolveLiveState renders as `could-not-check`, never as "published".
+    const queryErrored = (res as { isError?: boolean; error?: unknown }).isError === true
+      || (res as { error?: unknown }).error !== undefined;
+    const envelope = (res as { data?: { data?: unknown; error?: unknown } }).data;
+    if (!queryErrored && envelope?.error === undefined && envelope?.data !== undefined) {
+      return { ok: true, live: true };
+    }
+    console.error("getLivePageState: no HTTP status in the response envelope", { itemId: params.itemId });
+    return { ok: false, reason: "request-failed" };
   } catch (err) {
     const status = statusOf(err);
     if (status === 404) return { ok: true, live: false };

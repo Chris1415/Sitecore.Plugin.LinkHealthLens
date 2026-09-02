@@ -10,6 +10,7 @@
 // "wrong path". That is what makes this lead decisive where the REST
 // fallback is not.
 import type { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { unwrapGraphqlResponse } from "./graphqlEnvelope";
 
 const QUERY = `
   query LinkHealthLensLiveCheck($path: String!, $language: String!) {
@@ -36,12 +37,13 @@ export async function checkLiveViaEdge(
         body: { query: QUERY, variables: { path: params.path, language: params.language } },
       },
     });
-    const root = (res.data as { data?: { item?: { id?: string } | null; errors?: unknown[] } } | undefined)?.data;
+    const { hasBody, data: root, errors } = unwrapGraphqlResponse<{ item?: { id?: string } | null }>(res);
 
-    if (root?.errors?.length) {
+    if (errors.length) {
+      console.error("checkLiveViaEdge: GraphQL errors", { path: params.path, errors });
       return { ok: false, reason: "graphql-error" };
     }
-    if (!root) {
+    if (!hasBody || !root) {
       return { ok: false, reason: "graphql-error" };
     }
     return { ok: true, exists: root.item !== null && root.item !== undefined };

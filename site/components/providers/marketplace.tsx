@@ -34,15 +34,29 @@ export const MarketplaceProvider: React.FC<ClientSDKProviderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // A failed / empty `application.context` used to leave `appContext` null
+  // forever, and the provider renders `null` in that state — a permanently
+  // blank panel with no message, which NFR-2 forbids. It is now a reported
+  // error. The response is NOT logged: it carries both Sitecore context ids.
+  // docs/build-decisions.md#application-context-must-not-fail-silently
   useEffect(() => {
-    if (client) {
-      client.query("application.context").then((res) => {
-        if (res?.data) {
-          setAppContext(res.data);
-          console.log("appContext", res.data);
-        }
+    if (!client) return;
+    let cancelled = false;
+    client
+      .query("application.context")
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.data) setAppContext(res.data);
+        else setError("Sitecore did not return an application context for this app.");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("application.context query failed", err);
+        setError("Could not read this app's Sitecore context.");
       });
-    }
+    return () => {
+      cancelled = true;
+    };
   }, [client]);
 
   useEffect(() => {
@@ -77,7 +91,7 @@ export const MarketplaceProvider: React.FC<ClientSDKProviderProps> = ({
         <div>{error}</div>
         <div>
           Please check if the client SDK is loaded inside Sitecore Marketplace
-          parent window and you have properly set your app&apos;s extention points.
+          parent window and you have properly set your app&apos;s extension points.
         </div>
       </div>
     );

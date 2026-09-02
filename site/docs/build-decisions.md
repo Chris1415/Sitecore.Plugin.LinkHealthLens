@@ -860,3 +860,54 @@ the wrong base that produced the 15 false positives. Proven against the real cap
 pair (`resolveFindings.startItemPath.real.test.ts`) with both a real HIT set (`/models`, `/brand`,
 `/Contact`, `/Editions`, `/Technology`, `/models/velaro-s`) and the one real MISS (`/contact4`) asserted
 in the same test, so a regression in either direction (everything resolves / nothing resolves) fails.
+
+---
+
+## Code review 2026-09-02 — the four SDK-envelope decisions
+
+### GraphQL `errors` sit BESIDE `data`, not inside it {#graphql-errors-depth}
+
+All three XMC GraphQL passthroughs read the error array at `result.data.data.errors`. Per
+`node_modules/@sitecore-marketplace-sdk/xmc/dist/xmc/src/client-authoring/types.gen.d.ts`
+(`Authoring.GraphqlResponses[200]`), the body is `{ data?, errors? }` — `errors` is a **sibling** of
+`data`, so every `graphql-error` branch was unreachable. Consequence, not cosmetic: an errored query
+left `data` null, fell through to the "no item" branch, and reported **"Target not found"** — a false
+accusation about the author's link, from a check that never ran. Rejected: casting the error check
+into each call site again. `lib/sdk/graphqlEnvelope.ts` owns the depth once, so a fourth passthrough
+cannot reintroduce it. A missing body is now a failure, never a miss.
+
+### `QueryResult.status` is a string; the HTTP status is on the hey-api envelope {#live-page-state-http-status}
+
+`getLivePageState` read `res.status` expecting an HTTP code. `QueryResult.status` is
+`QueryStatus = 'idle'|'loading'|'error'|'success'`
+(`node_modules/@sitecore-marketplace-sdk/client/dist/types.d.ts`) — never numeric. The XMC module
+returns the hey-api result unchanged, so the code lives at `res.data.response.status`. Every resolved
+outcome therefore hit the final `return { live: true }`: the unpublished fallback **failed open**,
+reporting "published" for 404s and for hard failures alike, on the app's headline check. Now fails
+**closed** — an undeterminable status returns `request-failed`, which `resolveLiveState` renders as
+`could-not-check`. A payload with no error and no captured response is still accepted as live, so a
+2xx is not downgraded.
+
+### The root route is not a product surface {#root-route-is-not-a-surface}
+
+`/` shipped the scaffold demo, which rendered `JSON.stringify(applicationContext)` — both Sitecore
+context ids — into the DOM, and read the context id with `context?.preview as string`, the cast
+`marketplace-sdk-xmc` § 6a names as the anti-pattern. ADR-0004 declares exactly one extension point,
+so the demo was an undeclared second surface with a disclosure on it. Removed rather than guarded:
+nothing in the product imported it.
+
+### `application.context` must not fail silently {#application-context-must-not-fail-silently}
+
+`MarketplaceProvider` renders `null` until `appContext` resolves and had no failure branch, so a
+failed or empty `application.context` produced a permanently blank panel with no message — the exact
+outcome NFR-2 forbids. Now sets the provider's error state. The response is also no longer
+`console.log`ged; it carries both context ids.
+
+### Parse the page once per scan, not twice per anchor {#parse-the-page-once-per-scan}
+
+`classifyFindings` called `classifyOrigin` and `attribute` per finding, each constructing its own
+`DOMParser` over the whole page — ~2N full parses, ~300 on the 150-anchor page the ≤6s worst-observed
+criterion is measured against, plus a re-`JSON.parse` of `presentationDetails` per anchor. The parse
+is hoisted into `classifyFindings`; the `*In(doc, …)` variants take an already-parsed `Document`. The
+string-taking wrappers are kept so the existing per-check unit tests still exercise the same rule
+through the same entry point.

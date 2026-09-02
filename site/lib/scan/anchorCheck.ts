@@ -9,9 +9,16 @@ const FRAGMENT_ONLY = /^#(.+)$/;
 export function checkInPageAnchor(href: string, html: string): boolean {
   const match = href.trim().match(FRAGMENT_ONLY);
   if (!match) return false;
+  return checkInPageAnchorIn(new DOMParser().parseFromString(html, "text/html"), href);
+}
+
+/** Same check against an ALREADY-PARSED document — see
+ * docs/build-decisions.md#parse-the-page-once-per-scan. */
+export function checkInPageAnchorIn(doc: Document, href: string): boolean {
+  const match = href.trim().match(FRAGMENT_ONLY);
+  if (!match) return false;
 
   const targetName = match[1];
-  const doc = new DOMParser().parseFromString(html, "text/html");
   if (doc.getElementById(targetName)) return false;
 
   const named = Array.from(doc.querySelectorAll("[name]"));

@@ -27,7 +27,7 @@ export type Attribution = NonNullable<LinkFinding["attribution"]>;
 // unstated. The flat-array shape is kept too (attribute.test.ts's fixtures
 // and any tenant that DOES deliver it flat) so this is additive, not a
 // behaviour change for either shape.
-function parsePresentationDetails(raw: string | undefined): PresentationDetailEntry[] | null {
+export function parsePresentationDetails(raw: string | undefined): PresentationDetailEntry[] | null {
   if (!raw) return null;
   let parsed: unknown;
   try {
@@ -93,10 +93,23 @@ export function attribute(
   html: string,
   presentationDetailsRaw: string | undefined,
 ): Attribution | null {
-  const renderings = parsePresentationDetails(presentationDetailsRaw);
+  return attributeIn(
+    new DOMParser().parseFromString(html, "text/html"),
+    ordinal,
+    parsePresentationDetails(presentationDetailsRaw),
+  );
+}
+
+/** Same correlation against an ALREADY-PARSED document and ALREADY-PARSED
+ * rendering list — see classifyOriginIn's note and
+ * docs/build-decisions.md#parse-the-page-once-per-scan. */
+export function attributeIn(
+  doc: Document,
+  ordinal: number,
+  renderings: PresentationDetailEntry[] | null,
+): Attribution | null {
   if (!renderings || renderings.length === 0) return null;
 
-  const doc = new DOMParser().parseFromString(html, "text/html");
   const main = doc.querySelector("main");
   if (!main) return null;
 

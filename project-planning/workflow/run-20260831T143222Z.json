@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-02T11:30:00Z",
+  "updated_at": "2026-09-02T14:13:26.036Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -36,6 +36,17 @@
     "resolved_at": "2026-08-31T14:20:00Z",
     "signals": [
       "new product — nothing to inherit (no prior manifest) and nothing to detect (no tree); M0 ladder rung 4. Resolved by /start-flow and carried into /create-prd step 0."
+    ],
+    "briefs_resolved": [
+      {
+        "stage": "code-review",
+        "at": "2026-09-02T13:50:33.111Z",
+        "composition": "platform:marketplace × method:greenfield × audience:developer",
+        "active": [
+          "platform:marketplace"
+        ],
+        "topology": "repo-per-deployable"
+      }
     ]
   },
   "// workspace": "Names resolved from an active platform pack's `workspace.naming` (ONE owner — pack.json, not the command). `brand_name` is the ROOT of the derive chain: deploy_project_name / project_slug / head_app_slug all descend from it, so an unresolved brand_name leaves every one of them null rather than guessed. Declared 2026-08-27 — until then packs resolved these and the template had nowhere to put them, so each run invented a path. Slots exist for every name a shipped pack lists under `workspace.naming.tenant_facing` — `site_name` / `editing_host_name` (content-sdk) and `app_name` (marketplace) were missing until 2026-08-28, so the field the `required_at` rule is NAMED after could not be recorded where the rule checks it, and one run repurposed `brand_name` for a Cloud Portal app name.",
@@ -180,7 +191,7 @@
     "task_breakdown": "products/marketplace/link-health-lens/project-planning/plans/task-breakdown-20260831T143222Z.md",
     "task_breakdown_pre_qa": null,
     "qa_report": null,
-    "code_review_report": null,
+    "code_review_report": "products/marketplace/link-health-lens/project-planning/plans/code-review-20260902T160500Z.md",
     "test_report": "products/marketplace/link-health-lens/project-planning/plans/test-report-20260902T110000Z.md",
     "content_test_report": null,
     "interrogation_ledger": "products/marketplace/link-health-lens/project-planning/plans/interrogation-discovery-20260831T143222Z.md",
@@ -340,6 +351,19 @@
       "escalations": [
         "(g) refuted — AC-7.1/AC-7.4 describe a capability the platform does not offer"
       ]
+    },
+    {
+      "stage": "code_reviewed",
+      "agent": "08-developer",
+      "outcome": "completed",
+      "one_line": "Whole-build adversarial review with the pack brief resolved for the first time — 2 Critical + 4 Major fixed, 6 Minor left; 269/269, tsc/lint/build clean",
+      "deliverables": [
+        "project-planning/plans/code-review-20260902T160500Z.md",
+        "site/lib/sdk/graphqlEnvelope.ts",
+        "site/docs/build-decisions.md"
+      ],
+      "escalations": [],
+      "error": null
     }
   ],
   "// stage_history — schema 7 contract": [
@@ -512,6 +536,16 @@
       "measured": "Every link on Velaro Home resolves in CM and is present on live Edge (8 of 8, including the /Models vs /models case pair). Every tested Zephira target likewise (5 of 5: /book, /book/manage, /destinations/Accra, /destinations/Lisbon, /stories). So neither candidate page produces a single finding from ANY check — string or resolution.",
       "consequence": "M4's control proves nothing, because control-clean and known-bad-clean are identical. The checker is NOT demonstrated to fire on anything.",
       "what_a_bad_link_would_be": "Koven Home is UNPUBLISHED and nothing links to it. A link to it would produce 'exists but not published'. A link to a non-existent path would produce 'target not found'. Both are one authored link away."
+    },
+    "code-review-with-brief": {
+      "outcome": "2 Critical + 4 Major found and fixed",
+      "why_this_run_happened": "The original /code-review was driven as a hand-written sub-agent prompt, so the pack brief was NEVER RESOLVED and its two mandatory_when skills (marketplace-sdk-client, marketplace-sdk-xmc — CRITICAL per violation) were never loaded. This re-run resolved the brief with --record and loaded them.",
+      "critical_1": "GraphQL `errors` read at res.data.data.errors in all three XMC passthroughs (resolveItemByPath, resolveItemPathById, checkLiveViaEdge). Per node_modules/@sitecore-marketplace-sdk/xmc/dist/xmc/src/client-authoring/types.gen.d.ts, GraphqlResponses[200] = { data?, errors? } — errors is a SIBLING of data. The branch was UNREACHABLE, so a GraphQL failure fell through to found:false and the panel told the editor 'Target not found' about a link nobody had checked. Fixed with a shared lib/sdk/graphqlEnvelope.ts; a missing body is now a failure, never a miss.",
+      "critical_2": "getLivePageState read the HTTP status off QueryResult.status, which is QueryStatus = 'idle'|'loading'|'error'|'success' (client/dist/types.d.ts) and never a number. The real value is at res.data.response.status. EVERY resolved outcome — 404, 500, hard failure — returned { live: true }, so the headline unpublished check FAILED OPEN. Now fails CLOSED to could-not-check.",
+      "majors": "Fixtures encoded both defects (a hand-written fixture confirming the author's misunderstanding — the same class as the earlier rootPath defect); the scaffold demo route / rendered the full application.context including BOTH sitecoreContextIds into the DOM on an undeclared second surface (ADR-0004 declares one) and used the `as string` context-id cast the skill names as the anti-pattern; MarketplaceProvider had no failure path for application.context, so a failed query left the panel permanently blank (NFR-2); page HTML was re-parsed ~2x per anchor (~300 DOMParser passes at 150 anchors) against the 6s budget.",
+      "orchestrator_verification": "Both Criticals checked against the .d.ts directly rather than accepted from the report: GraphqlResponses[200] confirmed { data?, errors? }; QueryStatus confirmed a four-value string union. Green state re-run independently: 269/269 (44 files), tsc --noEmit exit 0, lint 0 errors + 2 pre-existing warnings in vendored components/ui, next build OK (3 routes). C1 MUTATION-CHECKED by the orchestrator: restoring the old error depth in graphqlEnvelope.ts was ASSERTED to have changed the file, then the suite went 1 failed / 268 passed; restored and re-verified 269/269.",
+      "what_this_validates": "The brief-coverage fix (packs/findings.md F40). The two mandatory skills the original run never loaded found two CRITICAL defects in the direction that reads as success — one reporting a confident wrong answer to the editor, one silently claiming every page is published. Neither was visible to 264 passing tests, four prior reviews, tsc, lint or the build.",
+      "still_open": "getLivePageState's real 404 envelope has never been captured in-app. The fix makes the worst case an honest could-not-check rather than a false 'published', but the unpublished check is unverified until one real-tenant observation of that shape."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -972,7 +1006,17 @@
     "tr6_two_real_bugs_caught": "The Developer reported two defects it hit rather than avoided by luck: a useEffect-based disclosure reset rejected by react-hooks/set-state-in-effect (a hard lint error, fixed with adjust-state-during-render), and a first-cut zero-client.mutate gate that failed immediately against real source. The second is the exact defect the brief warned about, caught by running the gate rather than reasoning about it.",
     "build_gate_checklist": "Panel state -> POC frame: default view -> index.html · each group -> group-<id>-{closed,open}.html · scope disclosure -> state-scope-open.html · after Open in canvas -> state-jumped-r1.html (label text intentionally DIFFERS from the POC per ADR-0010) · loading/error/no-links/clean/chrome-only -> the matching state-*.html · widths -> state-width-320.html / state-width-400.html.",
     "rule88_instance_seven": "The orphaned ChromeOnly is the SEVENTH instance of rule 88's pattern in this run: something well-formed that nothing used. It was found only because the review was explicitly told to hunt for it in a 2,768-line diff. The others: pack.rules[] unread, the base-chain script with no caller, the /design brief's empty skills list, the export mirror sync, the red typecheck behind a green build, the SDK contract gate nothing could satisfy, and now a component nothing rendered.",
-    "estate_is_clean_finding": "Worth stating for its own sake: across two brands and 13 tested link targets, every internal link resolves and is published. That is a genuine quality signal about the estate — and the reason this app cannot be proven on it."
+    "estate_is_clean_finding": "Worth stating for its own sake: across two brands and 13 tested link targets, every internal link resolves and is published. That is a genuine quality signal about the estate — and the reason this app cannot be proven on it.",
+    "gates": {
+      "manifest_pointers": [
+        {
+          "stage": "code-review",
+          "exit": 1,
+          "at": "2026-09-02T16:15:00Z",
+          "override_reason": "This stage's OWN pointer defect was found by the gate and FIXED, not overridden: canonical_artifacts.code_review_report was first written product-relative (project-planning/plans/...) while every other slot holds a full logical path (products/marketplace/link-health-lens/...), so it resolved to nothing. The 14 remaining ERRORs are all PRE-EXISTING and predate this gate, which was added to the framework on 2026-09-02, after every one of them was written: stage_history[0..3] missing `one_line` and stage_history[1].outcome = \"confirmed\" (an illegal value that /create-prd's own prose prescribed until it was corrected the same day); operator_attention[0..6] missing `severity` and 52 entries carrying undeclared `type`/`status` keys; and canonical_artifacts.probe_findings + .host_frame_feasibility written into slots run-manifest.template.json never declared. Repairing 11 history/attention entries and reconciling two undeclared slots is upstream contract remediation, not code review — recorded here so it is visible rather than silently carried, and surfaced to the operator."
+        }
+      ]
+    }
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,

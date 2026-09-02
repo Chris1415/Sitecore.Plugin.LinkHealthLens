@@ -7,6 +7,7 @@
 // (docs/build-decisions.md). Same envelope shape as resolveItemByPath.ts
 // (marketplace-sdk-xmc skill § 6c: body inside params, double-unwrap).
 import type { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { unwrapGraphqlResponse } from "./graphqlEnvelope";
 
 const QUERY = `
   query LinkHealthLensResolveStartItemPath($itemId: ID!, $language: String!) {
@@ -37,13 +38,17 @@ export async function resolveItemPathById(
         body: { query: QUERY, variables: { itemId: params.itemId, language: params.language } },
       },
     });
-    const root = (res.data as { data?: { item?: { path?: string } | null; errors?: unknown[] } } | undefined)?.data;
+    const { hasBody, data: root, errors } = unwrapGraphqlResponse<{ item?: { path?: string } | null }>(res);
 
-    if (root?.errors?.length) {
-      console.error("resolveItemPathById: GraphQL errors", { itemId: params.itemId, errors: root.errors });
+    if (errors.length) {
+      console.error("resolveItemPathById: GraphQL errors", { itemId: params.itemId, errors });
       return { ok: false, reason: "graphql-error" };
     }
-    if (!root || root.item === null || root.item === undefined) {
+    if (!hasBody || !root) {
+      console.error("resolveItemPathById: no GraphQL data in response", { itemId: params.itemId });
+      return { ok: false, reason: "graphql-error" };
+    }
+    if (root.item === null || root.item === undefined) {
       return { ok: true, found: false };
     }
     if (typeof root.item.path !== "string") {

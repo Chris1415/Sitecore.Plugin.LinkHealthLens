@@ -5,16 +5,14 @@
 // — the SDK verb name reflects the transport, not the tenant effect; ADR-0009
 // itself names this call sanctioned and Mode A/ADR-0002-compliant.
 //
-// Envelope shape (marketplace-sdk-xmc skill § 6c, the "Component Usage Atlas
-// burned a week" trap): body lives INSIDE params, never at the top level, and
-// the response DOUBLE-unwraps (result.data.data) — both differ from the REST
-// mutations elsewhere in this app.
+// Envelope shape (marketplace-sdk-xmc skill § 6c): body lives INSIDE params,
+// never at the top level; `data` and `errors` are SIBLINGS one level down —
+// see docs/build-decisions.md#graphql-errors-depth.
 //
-// Context: Authoring reads the CM working tree, the same class of call as
-// pagesGetPageHtml — `.preview`, not `.live` (matches usePageScan's existing
-// choice; `.live` is reserved for the genuine Edge/Delivery read in
-// checkLiveViaEdge.ts).
+// Context: Authoring reads the CM working tree — `.preview`, not `.live`
+// (`.live` is reserved for checkLiveViaEdge.ts).
 import type { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { unwrapGraphqlResponse } from "./graphqlEnvelope";
 
 const QUERY = `
   query LinkHealthLensResolveTarget($path: String!, $language: String!) {
@@ -46,13 +44,21 @@ export async function resolveItemByPath(
         body: { query: QUERY, variables: { path: params.path, language: params.language } },
       },
     });
-    const root = (res.data as { data?: { item?: { itemId?: string; name?: string } | null; errors?: unknown[] } } | undefined)?.data;
+    const { hasBody, data: root, errors } = unwrapGraphqlResponse<{
+      item?: { itemId?: string; name?: string } | null;
+    }>(res);
 
-    if (root?.errors?.length) {
-      console.error("resolveItemByPath: GraphQL errors", { path: params.path, errors: root.errors });
+    if (errors.length) {
+      console.error("resolveItemByPath: GraphQL errors", { path: params.path, errors });
       return { ok: false, reason: "graphql-error" };
     }
-    if (!root || root.item === null || root.item === undefined) {
+    // No recognisable response body is a FAILURE, never a miss — reporting it
+    // as found:false would accuse the author's link of pointing at nothing.
+    if (!hasBody || !root) {
+      console.error("resolveItemByPath: no GraphQL data in response", { path: params.path });
+      return { ok: false, reason: "graphql-error" };
+    }
+    if (root.item === null || root.item === undefined) {
       return { ok: true, found: false };
     }
     if (typeof root.item.itemId !== "string" || typeof root.item.name !== "string") {

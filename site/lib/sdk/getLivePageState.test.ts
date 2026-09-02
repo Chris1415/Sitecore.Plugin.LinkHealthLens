@@ -16,22 +16,52 @@ describe("getLivePageState", () => {
     errorSpy.mockRestore();
   });
 
-  it("204/200 → live:true", async () => {
+  // REGRESSION (code review 2026-09-02): the HTTP status lives on the hey-api
+  // envelope at `res.data.response.status`. `QueryResult.status` is a
+  // QueryStatus STRING ('idle'|'loading'|'error'|'success' —
+  // node_modules/@sitecore-marketplace-sdk/client/dist/types.d.ts), so the old
+  // fixtures put a number where the SDK never puts one; the whole 404 branch
+  // was unreachable and every outcome resolved to live:true.
+  it("204/200 → live:true, read off the hey-api envelope's response.status", async () => {
     const { stubClient, query } = createStubClient();
-    query.mockResolvedValueOnce({ data: { data: {} }, status: 200 } as never);
+    query.mockResolvedValueOnce({
+      data: { data: {}, response: { status: 200 } },
+      status: "success",
+    } as never);
 
     const result = await getLivePageState(stubClient, { itemId: "abc", language: "en", contextId: "ctx-1" });
 
     expect(result).toEqual({ ok: true, live: true });
   });
 
-  it("a RESOLVED result carrying status:404 is treated as data (unpublished), not an error", async () => {
+  it("a RESOLVED result whose envelope carries response.status 404 is data (unpublished), not an error", async () => {
     const { stubClient, query } = createStubClient();
-    query.mockResolvedValueOnce({ status: 404, error: { detail: "Not Found" } } as never);
+    query.mockResolvedValueOnce({
+      data: { error: { detail: "Not Found" }, response: { status: 404 } },
+      status: "success",
+    } as never);
 
     const result = await getLivePageState(stubClient, { itemId: "abc", language: "en", contextId: "ctx-1" });
 
     expect(result).toEqual({ ok: true, live: false });
+  });
+
+  it("FAILS CLOSED: no HTTP status anywhere and no payload → request-failed, never live:true", async () => {
+    const { stubClient, query } = createStubClient();
+    query.mockResolvedValueOnce({ data: undefined, error: new Error("boom"), status: "error", isError: true } as never);
+
+    const result = await getLivePageState(stubClient, { itemId: "abc", language: "en", contextId: "ctx-1" });
+
+    expect(result).toEqual({ ok: false, reason: "request-failed" });
+  });
+
+  it("a payload with no error and no status is still accepted as live (2xx with no captured response)", async () => {
+    const { stubClient, query } = createStubClient();
+    query.mockResolvedValueOnce({ data: { data: { pageId: "abc" } }, status: "success" } as never);
+
+    const result = await getLivePageState(stubClient, { itemId: "abc", language: "en", contextId: "ctx-1" });
+
+    expect(result).toEqual({ ok: true, live: true });
   });
 
   it("a THROWN error carrying status:404 is also treated as data (regression: the headline-defect case)", async () => {
@@ -46,7 +76,7 @@ describe("getLivePageState", () => {
 
   it("500 → ok:false, reason:'request-failed' — never 'live:false'", async () => {
     const { stubClient, query } = createStubClient();
-    query.mockResolvedValueOnce({ status: 500, error: {} } as never);
+    query.mockResolvedValueOnce({ data: { error: {}, response: { status: 500 } }, status: "success" } as never);
 
     const result = await getLivePageState(stubClient, { itemId: "abc", language: "en", contextId: "ctx-1" });
 

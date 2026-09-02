@@ -20,7 +20,14 @@ const CONTENT_LANDMARK = "main";
  * caller never has to re-derive an anchor's position from a DOM reference.
  */
 export function classifyOrigin(ordinal: number, html: string): LinkOrigin {
-  const doc = new DOMParser().parseFromString(html, "text/html");
+  return classifyOriginIn(new DOMParser().parseFromString(html, "text/html"), ordinal);
+}
+
+/** Same rule against an ALREADY-PARSED document. `classifyFindings` parses the
+ * page once per scan and calls this per anchor — parsing per anchor cost two
+ * full re-parses of the whole page per link
+ * (docs/build-decisions.md#parse-the-page-once-per-scan). */
+export function classifyOriginIn(doc: Document, ordinal: number): LinkOrigin {
   const anchor = doc.querySelectorAll("a")[ordinal - 1];
 
   // No anchor at that ordinal — a caller passed a stale/out-of-range index
