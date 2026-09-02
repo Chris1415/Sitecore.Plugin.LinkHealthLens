@@ -1,0 +1,3 @@
+{"_captured":"devrel Velaro Home, from the operator's real GraphQL cross-check against /contact4 (MISS) and /models (HIT), 2026-09-02",
+"_note":"pages.context's siteInfo as delivered by the real tenant — rootPath sits under siteInfo.properties, not siteInfo directly. This is the fixture that proves usePageScan's original `ctx.siteInfo?.rootPath` read was always undefined at runtime.",
+"siteInfo":{"id":"0cc4df04-0000-0000-0000-000000000000","name":"Velaro","language":"en","startItemId":"ef14cc17-5a0b-4c15-aa2a-98749073b5db","targetHostname":"","hostnames":["*"],"properties":{"isSxaSite":true,"rootPath":"/sitecore/content/Velaro-Brand/Velaro","isLocalDatasourcesEnabled":true,"linkSettings":"ItselfOnly","isLinkableSite":false}}}

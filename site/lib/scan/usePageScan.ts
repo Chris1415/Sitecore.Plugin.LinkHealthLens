@@ -155,11 +155,15 @@ export function usePageScan(): UsePageScanResult {
       // failure (NFR-2) — a systemic failure degrades the health flag, a
       // partial one only marks the findings it actually touched.
       const { findings, health: resolutionHealth } = await resolveInternalFindings(stringChecked, {
-        // siteInfo.rootPath is real at runtime (probe (d) addendum) but sits
-        // outside PagesContextSiteInfo's declared fields — the interface's
-        // own `[key: string]: any` index signature is what makes this a
-        // type-safe read rather than a cast.
-        siteRootPath: ctx.siteInfo?.rootPath,
+        // Defect fix 2026-09-02: the real tenant payload nests this under
+        // `siteInfo.properties.rootPath` (verified against a live capture —
+        // docs/build-decisions.md), not `siteInfo.rootPath` as the prior
+        // comment here asserted. Both sit behind an `[key: string]: any`
+        // index signature (PagesContextSiteInfo / its `properties`), so
+        // either read is type-safe; only the nested one is ever populated.
+        // The top-level fallback is kept in case a future payload shape
+        // reverts — never silently prefer a shape that doesn't exist.
+        siteRootPath: ctx.siteInfo?.properties?.rootPath ?? ctx.siteInfo?.rootPath,
         language: page.language,
         client,
         authoringContextId: contextId,

@@ -39,8 +39,13 @@ function wrapperFor(
   };
 }
 
+// Nested under `properties` — the real tenant shape (verified live capture,
+// project-planning/captures/velaro-home-site-info.DEVREL.json). A prior
+// version of this fixture used a top-level `siteInfo.rootPath`, which is the
+// exact wrong shape that let the usePageScan defect (rootPath read one level
+// too shallow) pass every test while failing live (fixed 2026-09-02).
 const READY_CTX: PagesContext = {
-  siteInfo: { language: "en", rootPath: "/sitecore/content/Zephira-Brand/Zephira" },
+  siteInfo: { language: "en", properties: { rootPath: "/sitecore/content/Zephira-Brand/Zephira" } },
   pageInfo: { id: "page-1", name: "Home", path: "/", language: "en" },
 };
 
@@ -165,6 +170,83 @@ describe("usePageScan", () => {
       "xmc.agent.pagesGetPageHtml",
       expect.anything(),
     );
+  });
+
+  // Regression (defect fixed 2026-09-02, docs/build-decisions.md) — real
+  // tenant repro: `/contact4` (does not exist) must surface `not-found`,
+  // `/models` (exists) must resolve a `targetItemId` so the "Open in canvas"
+  // control renders. Both go through the FULL chain: usePageScan reads
+  // `ctx.siteInfo.properties.rootPath`, passes it to resolveInternalFindings,
+  // which calls `xmc.authoring.graphql` with the real content-tree path.
+  it("resolves siteRootPath from the real nested siteInfo.properties shape end to end — MISS surfaces not-found, HIT gets a targetItemId", async () => {
+    const { stubClient, query, mutate } = createStubClient();
+    let onSuccess: ((ctx: PagesContext) => void) | undefined;
+    query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
+      onSuccess = opts?.onSuccess;
+      return Promise.resolve({ data: undefined, unsubscribe: vi.fn() });
+    }) as never);
+
+    const ROOT = "/sitecore/content/Velaro-Brand/Velaro";
+    const ctx: PagesContext = {
+      siteInfo: { language: "en", properties: { rootPath: ROOT } },
+      pageInfo: { id: "page-home", name: "Home", path: "/", language: "en" },
+    };
+
+    mutate.mockImplementation((async (key: string, opts: { params: { body: { variables: { path: string } } } }) => {
+      if (key === "xmc.authoring.graphql") {
+        if (opts.params.body.variables.path === `${ROOT}/models`) {
+          return { data: { data: { item: { itemId: "MODELS-ITEM-ID", name: "Models" } } } };
+        }
+        return { data: { data: { item: null } } }; // /contact4 — MISS
+      }
+      return { data: { data: { item: { id: "live-1" } } } };
+    }) as never);
+
+    const { result } = renderHook(() => usePageScan(), { wrapper: wrapperFor(stubClient) });
+    await waitFor(() => expect(onSuccess).toBeDefined());
+    query.mockResolvedValueOnce({
+      data: {
+        data: {
+          pageId: "page-home",
+          html: '<a href="/contact4">Missing</a><a href="/models">Models</a>',
+        },
+      },
+    } as never);
+    onSuccess?.(ctx);
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const contact4 = result.current.scan?.findings.find((f) => f.href === "/contact4");
+    const models = result.current.scan?.findings.find((f) => f.href === "/models");
+    expect(contact4?.statuses.has("not-found")).toBe(true);
+    expect(models?.targetItemId).toBe("MODELS-ITEM-ID");
+  });
+
+  // Regression (defect fixed 2026-09-02) — the missing-root defect this
+  // component tolerated silently: no site root at all must not render as a
+  // clean page. Every internal finding is marked `could-not-check` and
+  // health.resolution is false.
+  it("a page context with no site root at all is loud, never a silently clean page", async () => {
+    const { stubClient, query, mutate } = createStubClient();
+    let onSuccess: ((ctx: PagesContext) => void) | undefined;
+    query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
+      onSuccess = opts?.onSuccess;
+      return Promise.resolve({ data: undefined, unsubscribe: vi.fn() });
+    }) as never);
+
+    const { result } = renderHook(() => usePageScan(), { wrapper: wrapperFor(stubClient) });
+    await waitFor(() => expect(onSuccess).toBeDefined());
+    query.mockResolvedValueOnce({
+      data: { data: { pageId: "page-home", html: '<a href="/contact4">Missing</a>' } },
+    } as never);
+    onSuccess?.({
+      siteInfo: { language: "en" }, // no properties, no rootPath
+      pageInfo: { id: "page-home", name: "Home", path: "/", language: "en" },
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    expect(result.current.scan?.health.resolution).toBe(false);
+    expect(result.current.scan?.findings[0]?.statuses.has("could-not-check")).toBe(true);
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("unsubscribes on unmount", async () => {

@@ -13,16 +13,26 @@ const NON_PAGE_PREFIX = /^\/-\//;
 
 export function normalizeInternalTarget(href: string, siteRootPath: string | undefined): string | null {
   if (!siteRootPath) return null;
-  if (href === NO_HREF) return null;
+  if (!needsInternalLookup(href)) return null;
 
   const withoutFragment = href.split("#")[0];
-  const withoutQuery = withoutFragment.split("?")[0];
-  const trimmed = withoutQuery.trim();
-  if (!trimmed) return null; // fragment-only or empty — resolves to the current page, not a lookup
-
-  if (NON_PAGE_PREFIX.test(trimmed)) return null;
-
+  const trimmed = withoutFragment.split("?")[0].trim();
   const relative = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   const root = siteRootPath.replace(/\/+$/, "");
   return relative === "/" ? root : `${root}${relative}`;
+}
+
+// Defect fix 2026-09-02: split out of normalizeInternalTarget so a caller can
+// tell "this href needs a content-tree lookup but none is possible right now
+// (no site root)" apart from "this href never needed one" (fragment-only,
+// current-page, media/asset paths) — the two collapsed to the same `null`
+// before, which is what let a missing site root degrade to a silently clean
+// page instead of a loud could-not-check (docs/build-decisions.md).
+export function needsInternalLookup(href: string): boolean {
+  if (href === NO_HREF) return false;
+  const withoutFragment = href.split("#")[0];
+  const withoutQuery = withoutFragment.split("?")[0];
+  const trimmed = withoutQuery.trim();
+  if (!trimmed) return false; // fragment-only or empty — resolves to the current page, not a lookup
+  return !NON_PAGE_PREFIX.test(trimmed);
 }

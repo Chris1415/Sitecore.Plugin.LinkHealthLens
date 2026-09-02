@@ -9,7 +9,7 @@
 import type { ClientSDK } from "@sitecore-marketplace-sdk/client";
 import type { LinkFinding, StatusMember } from "@/lib/model/types";
 import { mapWithConcurrency } from "./concurrency";
-import { normalizeInternalTarget } from "./normalizeInternalTarget";
+import { needsInternalLookup, normalizeInternalTarget } from "./normalizeInternalTarget";
 import { resolveInternal } from "./resolveInternal";
 import { resolveLiveState } from "./resolveLiveState";
 import { logScanTiming, nowMs } from "./timing";
@@ -46,13 +46,24 @@ export async function resolveInternalFindings(
 ): Promise<ResolveFindingsOutcome> {
   const start = nowMs();
 
+  // Defect fix 2026-09-02: a missing site root must be LOUD, not a silent
+  // "excluded — nothing to check" (docs/build-decisions.md). Every internal
+  // finding whose href WOULD need a lookup is flagged below rather than
+  // dropped; `rootMissingAffected` drives the systemic health flag.
+  const rootMissing = !ctx.siteRootPath;
+  let rootMissingAffected = false;
+
   // De-dup by resolved path (ADR-0009 addendum) — group every internal
   // finding under the ONE path key it normalizes to.
   const pathToFindings = new Map<string, LinkFinding[]>();
   for (const finding of findings) {
     if (finding.scope !== "internal") continue;
+    if (rootMissing) {
+      if (needsInternalLookup(finding.href)) rootMissingAffected = true;
+      continue; // no site root — no lookup is possible, handled below
+    }
     const path = normalizeInternalTarget(finding.href, ctx.siteRootPath);
-    if (path === null) continue; // excluded — no lookup (fragment-only, media, no site root)
+    if (path === null) continue; // excluded — no lookup (fragment-only, current-page, media)
     const bucket = pathToFindings.get(path);
     if (bucket) bucket.push(finding);
     else pathToFindings.set(path, [finding]);
@@ -103,6 +114,16 @@ export async function resolveInternalFindings(
 
   const resolvedFindings = findings.map((finding) => {
     if (finding.scope !== "internal") return finding;
+    if (rootMissing) {
+      if (!needsInternalLookup(finding.href)) return finding;
+      // No site root — this finding genuinely needed a lookup and got none.
+      // Marked `could-not-check` (the same member call1 uses on a real
+      // resolution failure) so it renders as a visible row, never a silent
+      // "no findings" (defect fix 2026-09-02).
+      const statuses = new Set(finding.statuses);
+      statuses.add("could-not-check");
+      return { ...finding, statuses };
+    }
     const path = normalizeInternalTarget(finding.href, ctx.siteRootPath);
     if (path === null) return finding;
     const outcome = outcomes.get(path);
@@ -113,10 +134,13 @@ export async function resolveInternalFindings(
   });
 
   const health = {
-    // A systemic failure — every attempted lookup failed — degrades the flag
-    // without blanking the panel (NFR-2); a partial failure leaves it true so
-    // T032's "other checks still render" contract holds at this layer too.
-    resolution: uniquePaths.length === 0 || resolutionFailures < uniquePaths.length,
+    // A systemic failure — every attempted lookup failed, OR the site root
+    // itself was missing and internal findings needed one — degrades the
+    // flag without blanking the panel (NFR-2); a partial failure leaves it
+    // true so T032's "other checks still render" contract holds too.
+    resolution: rootMissing
+      ? !rootMissingAffected
+      : uniquePaths.length === 0 || resolutionFailures < uniquePaths.length,
     liveState: liveChecksAttempted === 0 || liveCheckFailures < liveChecksAttempted,
   };
 

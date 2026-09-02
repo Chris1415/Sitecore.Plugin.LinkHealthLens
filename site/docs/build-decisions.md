@@ -810,3 +810,30 @@ no fixture under `project-planning/captures/` pairs a real GraphQL response for 
 path — the captured fixtures are all real, existing pages. This is a code-and-unit-test verification, not a
 fresh live-tenant probe; the operator's own live portal report (the finding fired as expected) is the
 actual live confirmation, and the trace above accounts for why.
+
+**§ `siteInfo.rootPath` was never populated at runtime — third instance of the same misread class
+(fixed 2026-09-02).** The prior entry traced the `/contact3` pipeline correctly but from `resolveInternal`
+inward; it never checked what `usePageScan` actually fed `resolveInternalFindings` as `siteRootPath`.
+That value was read as `ctx.siteInfo?.rootPath`, on the strength of a comment claiming a probe had
+verified it "real at runtime." The real tenant payload (verified against the operator's exact GraphQL
+query/variables, `/contact4` MISS vs `/models` HIT) nests it one level deeper, under
+`siteInfo.properties.rootPath`. So `siteRootPath` was `undefined` on every real page, every internal
+finding's `normalizeInternalTarget` returned `null` (the "excluded — no site root" branch, indistinguishable
+from the legitimate "fragment-only/media, no lookup needed" exclusions), zero lookups ever ran, and the
+panel reported "No findings on this page" regardless of what the page actually linked to. Same class as
+the `presentationDetails` flat-array misread and the attribution-depth misread already on file here — a
+probe captured the right payload, the code read it one level off, and nothing failed loudly because the
+degraded path and the legitimately-clean path produced the same silent `null`.
+
+Fix, three parts: (1) `usePageScan.ts` now reads `ctx.siteInfo?.properties?.rootPath`, falling back to the
+old top-level read rather than deleting it outright — both sit behind an `[key: string]: any` index
+signature per the SDK's own `sdk-types.d.ts`, so neither read is a cast, only one is ever populated by the
+tenant. (2) `project-planning/captures/velaro-home-site-info.DEVREL.json` — the real `siteInfo` shape,
+added as a citable fixture alongside the existing `presentationDetails` one, and `usePageScan.test.tsx`'s
+`READY_CTX` fixture (which had been asserting the wrong shape all along) now matches it. (3) The silent
+`null` was itself the defect, not just the property path — `normalizeInternalTarget` split into itself
+(needs a real root) plus `needsInternalLookup` (would this href need one, root or not), so
+`resolveInternalFindings` can now tell "no site root, and this finding needed one" apart from "excluded for
+a real reason." The former now marks the finding `could-not-check` (the same status a genuine resolution
+failure gets) and flips `health.resolution` false, instead of returning a scan that renders identically to
+a page with no internal links at all.

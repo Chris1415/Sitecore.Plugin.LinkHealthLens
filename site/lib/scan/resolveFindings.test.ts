@@ -151,6 +151,44 @@ describe("resolveInternalFindings", () => {
     expect(result[1].targetItemId).toBeNull();
   });
 
+  // Regression (defect fixed 2026-09-02, docs/build-decisions.md): a missing
+  // site root previously degraded every internal finding to a silent
+  // exclusion — "excluded — no lookup" — which read as a clean page. Now it
+  // must be loud: `could-not-check` on the affected rows, health.resolution
+  // false, and no lookup call attempted (there is nowhere to look).
+  it("a missing site root is LOUD — every internal finding needing a lookup is could-not-check, health.resolution flips false, no calls made", async () => {
+    const { stubClient, mutate } = createStubClient();
+
+    const findings = [
+      finding({ href: "/contact4", ordinal: 1 }),
+      finding({ href: "#anchor", ordinal: 2 }), // no lookup needed regardless of root
+      finding({ href: "/-/media/brochure.pdf", ordinal: 3 }), // no lookup needed regardless of root
+    ];
+    const { findings: result, health } = await resolveInternalFindings(findings, {
+      ...CTX(stubClient),
+      siteRootPath: undefined,
+    });
+
+    expect(result[0].statuses.has("could-not-check")).toBe(true);
+    expect(result[1].statuses.size).toBe(0);
+    expect(result[2].statuses.size).toBe(0);
+    expect(health.resolution).toBe(false);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("a missing site root with no internal findings needing a lookup leaves health.resolution true", async () => {
+    const { stubClient, mutate } = createStubClient();
+
+    const findings = [finding({ href: "#anchor", ordinal: 1 })];
+    const { health } = await resolveInternalFindings(findings, {
+      ...CTX(stubClient),
+      siteRootPath: undefined,
+    });
+
+    expect(health.resolution).toBe(true);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it("non-internal findings are left untouched", async () => {
     const { stubClient, mutate } = createStubClient();
 
