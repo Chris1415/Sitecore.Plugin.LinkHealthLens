@@ -124,9 +124,31 @@ export function GroupList({ findings }: { findings: LinkFinding[] }) {
     });
   };
 
+  const nonEmpty = GROUPS.filter((g) => (buckets.get(g.id) ?? []).length > 0);
+
+  // Defect fix 2026-09-02 (docs/build-decisions.md § clean-state group
+  // wrapper): an all-clean page puts every row in the SOLE "no-findings"
+  // group, whose verdict is already stated by VerdictHead above. A
+  // collapsible header naming and counting the one group that exists is
+  // chrome with nothing to disclose — render its rows directly. Deliberate
+  // divergence from the POC (state-clean.html renders the ordinary
+  // collapsible group here); every OTHER combination — including a clean
+  // page that also has an `external` group — still renders the normal
+  // grouped, collapsible list below.
+  if (nonEmpty.length === 1 && nonEmpty[0].id === "no-findings") {
+    const rows = buckets.get("no-findings") ?? [];
+    return (
+      <ul className="lhl-rows lhl-rows-flat">
+        {rows.map((finding) => (
+          <FindingRow finding={finding} key={`${finding.ordinal}-${finding.href}`} />
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <>
-      {GROUPS.filter((g) => (buckets.get(g.id) ?? []).length > 0).map((g) => (
+      {nonEmpty.map((g) => (
         <Group
           key={g.id}
           id={g.id}

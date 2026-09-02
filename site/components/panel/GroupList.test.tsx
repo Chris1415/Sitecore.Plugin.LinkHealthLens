@@ -21,6 +21,7 @@ function seed(overrides: Partial<LinkFinding>): LinkFinding {
     statuses: new Set<StatusMember>(["ok"]),
     attribution: null,
     targetLabel: null,
+    targetItemId: null,
     origin: "chrome",
     ...overrides,
   };
@@ -79,6 +80,33 @@ describe("GroupList — default disclosure", () => {
     fireEvent.click(malformedHeader);
     expect(malformedHeader.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelectorAll("#group-malformed .lhl-row")).toHaveLength(2);
+  });
+});
+
+describe("GroupList — clean-state group wrapper (defect fixed 2026-09-02)", () => {
+  it("an all-clean page renders its rows flat, with NO collapsible group header at all", () => {
+    const { container } = renderGroups([
+      seed({ ordinal: 1, statuses: new Set<StatusMember>(["ok"]) }),
+      seed({ ordinal: 2, statuses: new Set<StatusMember>(["ok"]) }),
+      seed({ ordinal: 3, statuses: new Set<StatusMember>(["ok"]) }),
+    ]);
+    expect(container.querySelectorAll(".lhl-group-head")).toHaveLength(0);
+    expect(container.querySelectorAll(".lhl-group")).toHaveLength(0);
+    expect(container.querySelectorAll(".lhl-row")).toHaveLength(3);
+  });
+
+  it("a clean page that ALSO has an external group renders the ordinary grouped, collapsible list (not the flat form)", () => {
+    const { container } = renderGroups([
+      seed({ ordinal: 1, statuses: new Set<StatusMember>(["ok"]) }),
+      seed({
+        ordinal: 2,
+        scope: "external",
+        statuses: new Set<StatusMember>(["ok", "reachability-not-checked"]),
+      }),
+    ]);
+    expect(container.querySelectorAll(".lhl-group-head").length).toBeGreaterThan(0);
+    expect(document.getElementById("group-no-findings")).not.toBeNull();
+    expect(document.getElementById("group-external")).not.toBeNull();
   });
 });
 

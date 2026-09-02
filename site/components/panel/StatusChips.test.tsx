@@ -39,4 +39,31 @@ describe("StatusChips", () => {
     const note = chips.find((c) => c.textContent?.includes("Reachability not checked"));
     expect(note?.className).not.toContain("is-headline");
   });
+
+  // Defect fix 2026-09-02 (clean-state row noise, docs/build-decisions.md).
+  it("a clean row (no real finding) renders NO 'No findings' chip at all", () => {
+    const { container } = render(<StatusChips statuses={new Set<StatusMember>()} />);
+    expect(screen.queryByText("No findings")).toBeNull();
+    expect(container.querySelectorAll(".lhl-chip")).toHaveLength(0);
+  });
+
+  it("a clean external row still renders the standing reachability-not-checked note, just no 'No findings' chip beside it", () => {
+    const { container } = render(
+      <StatusChips statuses={new Set<StatusMember>(["ok", "reachability-not-checked"])} />,
+    );
+    expect(screen.queryByText("No findings")).toBeNull();
+    const chips = Array.from(container.querySelectorAll(".lhl-chip"));
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain("Reachability not checked");
+    expect(chips[0].className).not.toContain("is-headline");
+  });
+
+  it("a real finding still headlines correctly when statuses also happens to carry 'ok' (defensive — production code never adds it)", () => {
+    const { container } = render(
+      <StatusChips statuses={new Set<StatusMember>(["not-found"])} />,
+    );
+    const chips = Array.from(container.querySelectorAll(".lhl-chip"));
+    expect(chips).toHaveLength(1);
+    expect(chips[0].className).toContain("is-headline");
+  });
 });

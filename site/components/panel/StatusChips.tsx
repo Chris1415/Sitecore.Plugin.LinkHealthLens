@@ -52,14 +52,27 @@ const STATUS_TONE: Record<StatusMember, "act" | "check" | "note" | "clear"> = {
 export function StatusChips({ statuses }: { statuses: Set<StatusMember> }) {
   const head = headlineOf(statuses);
   const rest = PRECEDENCE.filter((m) => statuses.has(m) && m !== head);
-  const ordered: StatusMember[] = [head, ...rest];
+  // Defect fix 2026-09-02 (docs/build-decisions.md § clean-state row noise):
+  // `ok` is never a real finding — headlineOf's own fallback for an EMPTY
+  // set, so a row with nothing else wrong headlines `ok` by construction,
+  // never because something added it. A "No findings" chip on every clean
+  // row said nothing the verdict line and group name didn't already say,
+  // repeated once per row. Drop it; every OTHER real member (including the
+  // standing reachability-not-checked note on an otherwise-clean external
+  // row) still renders exactly as before.
+  const ordered: StatusMember[] = head === "ok" ? [] : [head, ...rest];
   if (statuses.has("reachability-not-checked")) ordered.push("reachability-not-checked");
 
   return (
     <div className="lhl-chips">
-      {ordered.map((member, i) => {
+      {ordered.map((member) => {
         const Icon = STATUS_ICON[member];
-        const isHeadline = i === 0;
+        // member === head, never a bare "position 0" check — since the `ok`
+        // chip can now be absent from `ordered` entirely, the standing
+        // reachability-not-checked note could otherwise land at index 0 and
+        // wrongly inherit headline styling it never earned (it is never a
+        // headline candidate, precedence.ts).
+        const isHeadline = member === head && head !== "ok";
         const cls = "lhl-chip" + (isHeadline ? ` is-headline tone-${STATUS_TONE[member]}` : "");
         return (
           <span className={cls} key={member}>
