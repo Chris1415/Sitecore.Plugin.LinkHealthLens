@@ -4,16 +4,19 @@
    every var() below resolves against Blok's real tokens already declared in
    app/globals.css (--background, --foreground, --muted, --muted-foreground,
    --border, --ring, --primary, --primary-foreground, --destructive,
-   --warning). Geometry-only locals (--panel-w, --radius) are scoped to .lhl
-   so they shadow the ambient Blok radius rather than overriding it globally
-   (blok-theming: "scope CSS variable overrides to a container"). Port
-   checklist + measured token table: docs/build-decisions.md (T010, T011). */
+   --warning). Geometry-only locals (--panel-min-w, --radius) are scoped to
+   .lhl so they shadow the ambient Blok radius rather than overriding it
+   globally (blok-theming: "scope CSS variable overrides to a container").
+   Port checklist + measured token table: docs/build-decisions.md (T010,
+   T011). The fixed --panel-w hard pin was replaced with a fluid width +
+   --panel-min-w floor at the 2026-09-02 defect fix — see that entry. */
 
 .lhl {
-  --panel-w: 360px;
+  --panel-min-w: 320px;
   --radius: 6px;
-  width: var(--panel-w);
-  flex: 0 0 var(--panel-w);
+  width: 100%;
+  min-width: var(--panel-min-w);
+  flex: 1 1 auto;
   max-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
@@ -232,6 +235,10 @@
   font-size: 11px;
   color: var(--muted-foreground);
   margin-top: 1px;
+  /* fluid panel (defect fix 2026-09-02) can now grow past the POC's fixed
+     360px mock — cap the URL's own measure so a wide host still reads as a
+     line, not the whole panel. */
+  max-width: 60ch;
 }
 
 .lhl-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -337,16 +344,32 @@
 .lhl-state .lhl-retry:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* skeleton — a loading panel must never read as "clean" (PRD § 11), so the
-   skeleton is paired with an explicit progress label. */
+   skeleton is paired with an explicit progress label. Redrawn 2026-09-02
+   (operator-reported: the flat pulse bars read as unfinished, not busy) —
+   same DOM/row anatomy as before (title bar / href bar / chip pill, mirroring
+   FindingRow's three real lines), now with distinct shapes per line plus a
+   sheen sweep instead of a flat opacity pulse. Blok tokens only (--muted /
+   --background), no invented hex; cheap to paint (one gradient, GPU-composited
+   transform) since this can now appear on every debounced content edit. */
 .lhl-sk {
+  position: relative;
+  overflow: hidden;
   background: var(--muted);
   border-radius: 4px;
   height: 10px;
-  animation: lhl-pulse 1.4s ease-in-out infinite;
 }
-@keyframes lhl-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+.lhl-sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--background), transparent);
+  animation: lhl-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes lhl-shimmer { 100% { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) {
-  .lhl-sk { animation: none; opacity: .8; }
+  .lhl-sk::after { animation: none; display: none; }
+  .lhl-sk { opacity: .75; }
   .lhl-group-head .lhl-chev { transition: none; }
 }
 
@@ -359,8 +382,19 @@
   font-weight: 600;
   border-bottom: 1px solid var(--border);
 }
-.lhl-sk-row { padding: 10px 12px 11px 11px; border-left: 3px solid var(--muted); border-top: 1px solid var(--border); }
-.lhl-sk-row .lhl-sk + .lhl-sk { margin-top: 6px; }
+.lhl-sk-row {
+  padding: 10px 12px 11px 11px;
+  border-left: 3px solid var(--border);
+  border-top: 1px solid var(--border);
+}
+.lhl-sk-row .lhl-sk + .lhl-sk { margin-top: 7px; }
+/* the three shapes a real row always carries: a title bar, a thinner
+   monospace-height href bar, and a small pill standing in for the chip
+   strip — differentiated so the row reads as "content coming", not three
+   interchangeable grey blocks. */
+.lhl-sk-title { height: 11px; border-radius: 3px; }
+.lhl-sk-href { height: 8px; border-radius: 2px; }
+.lhl-sk-chip { height: 14px; width: 44%; border-radius: 999px; }
 
 .lhl-foot {
   border-top: 1px solid var(--border);

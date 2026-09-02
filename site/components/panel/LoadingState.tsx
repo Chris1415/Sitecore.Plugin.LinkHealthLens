@@ -40,9 +40,9 @@ export function LoadingState({ pageName }: { pageName?: string }) {
       </div>
       {ROWS.map((i) => (
         <div className="lhl-sk-row" key={i}>
-          <div className="lhl-sk" style={{ width: `${78 - i * 6}%` }} />
-          <div className="lhl-sk" style={{ width: `${62 - i * 4}%`, height: 8 }} />
-          <div className="lhl-sk" style={{ width: "44%", height: 14, borderRadius: 999 }} />
+          <div className="lhl-sk lhl-sk-title" style={{ width: `${78 - i * 6}%` }} />
+          <div className="lhl-sk lhl-sk-href" style={{ width: `${62 - i * 4}%` }} />
+          <div className="lhl-sk lhl-sk-chip" />
         </div>
       ))}
     </PanelShell>

@@ -765,3 +765,48 @@ Five new tests in `usePageScan.test.tsx` (fake timers, `vi.advanceTimersByTimeAs
 `fieldsUpdated` events coalesce to one re-scan; a page change re-scans immediately with a content debounce
 pending; the stale-guard drops a superseded debounced scan; unmount cancels the pending timer and
 unsubscribes both events; a throwing `subscribe()` still leaves page-change re-scanning intact.
+
+## Defect fixes — 2026-09-02 (operator-reported, live portal)
+
+**§ Fixed panel width — third deliberate POC divergence.** Live: the panel occupied ~275px inside a
+~510px-wide host iframe. Cause: `.lhl` (`app/panel.css`) carried the POC's `--panel-w: 360px` verbatim as
+a hard pin (`width: var(--panel-w)` + `flex: 0 0 var(--panel-w)`) — correct for the POC's fixed-360px mock
+frames, wrong for a real extension point whose host decides the width. `.lhl` is now fluid: `width: 100%`,
+`flex: 1 1 auto`, with a `--panel-min-w: 320px` floor (the narrowest POC frame width, so the panel stays
+usable at the small end) and no upper cap on the panel itself. The one row whose content genuinely gets
+uncomfortable at width is the href line (a raw URL) — capped at `max-width: 60ch` on `.lhl-href` itself,
+not on the panel, per the run brief's steer ("a measure limit on the text, not a cage around the whole
+panel"). Chips and the jump affordance already wrap (`flex-wrap`) and read fine with more room. POC left
+unedited — `verify-poc.mjs` asserts the POC's *semantics* against the POC's own `panel.js`/`panel.css` and
+never touches `app/panel.css`, so this divergence does not (and should not) move that gate. Recorded
+alongside the T042 count-rail and clean-state divergences above as the same class of change: a corrected
+port, not a defect in the port.
+
+**§ Loading skeleton redraw.** Live: the flat opacity-pulse bars (`lhl-pulse`) read as broken rather than
+busy. `.lhl-sk` now uses a sheen sweep (`::after` gradient, `translateX` animated) instead of an opacity
+pulse — both are equally cheap to paint (GPU-composited, one gradient) and equally silenced under
+`prefers-reduced-motion: reduce` (the media query now hides the sweep pseudo-element entirely rather than
+just removing the animation, since a static gradient smear reads worse than the flat block it replaces).
+The three lines each row already carried (title / href / chip, unchanged since T013) are now visually
+distinct shapes via named classes (`.lhl-sk-title`, `.lhl-sk-href`, `.lhl-sk-chip` — thickness + radius per
+line) instead of one shared `.lhl-sk` class with per-instance inline sizing, so the row reads as "a finding
+is coming" rather than three interchangeable grey blocks. `LoadingState.tsx`'s DOM shape (6 `.lhl-sk-row`s,
+each three `.lhl-sk` children) is unchanged — `LoadingState.test.tsx`'s row-count assertion still holds.
+Blok tokens only (`--muted`, `--background`); no invented hex. The "never reads as clean" guarantee
+(`Checking links…` verdict + `No result yet — this is not a clean page.` sub-line, `ScopeStrip noToggle`)
+is untouched — this fix is presentation-only inside the existing loading contract.
+
+**§ `/contact3`-class not-found finding — verified, not re-derived.** Traced the pipeline for an internal
+href whose path resolves to no CM item: `normalizeInternalTarget` (no exclusion for an ordinary page-shaped
+path like `/contact3` — only `/-/…` media paths and fragment/empty remainders are excluded) →
+`resolveItemByPath` (Authoring GraphQL `item(where:{path,language})`; `root.item === null` → `{ ok: true,
+found: false }`, the literal shape a nonexistent path returns) → `resolveInternal` (`found: false` →
+`{ status: "not-found" }`, terminal, no call 2) → `resolveInternalFindings` (`status === "not-found"` →
+`statuses: ["not-found"]`, `targetItemId: null`) → `precedence.ts` (`"not-found"` is highest-precedence,
+so it headlines) → `copy.ts` (`"Target not found"` / `"No item in the CM matches this path."`). Each hop
+already carries its own unit test (`resolveInternal.test.ts` line 10: "no result from call 1 ⇒ not-found,
+terminal"); no code change was needed. **Caveat, stated per rule 88 rather than folded into "confirmed":**
+no fixture under `project-planning/captures/` pairs a real GraphQL response for a genuinely nonexistent
+path — the captured fixtures are all real, existing pages. This is a code-and-unit-test verification, not a
+fresh live-tenant probe; the operator's own live portal report (the finding fired as expected) is the
+actual live confirmation, and the trace above accounts for why.
