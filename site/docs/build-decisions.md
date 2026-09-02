@@ -522,10 +522,20 @@ elsewhere in this app, so none is threaded through here — confirmed against th
 
 **T038/T040 — OriginAffordance / ChromeOnly scoping.** `OriginAffordance` is a single-return, three-way
 switch (chrome / unattributed / JumpAction) — mutual exclusivity is structural, not merely tested.
-`ChromeOnly`/`isChromeOnly` are scoped to the ALL-chrome case only; the partial-chrome sub-line ("N of
-them are site chrome...") needs the full precedence-headline group counts T042 (TR-6, VerdictHead)
-owns, and building it here would preempt that contract the same way TR-3/TR-4 avoided preempting
-TR-6's row/group UI.
+`ChromeOnly`/`isChromeOnly` were scoped to the ALL-chrome case only at TR-5 time; the partial-chrome
+sub-line ("N of them are site chrome...") needed the full precedence-headline group counts T042
+(TR-6, VerdictHead) owns.
+
+**Code-review correction (TR-5+TR-6 review) — `ChromeOnly.tsx` removed as dead code.** Once T042
+landed, `computeVerdict` (`lib/panel/verdict.ts`) already produces the exact all-chrome sub-line
+(`counts.chrome === actionable` branch, same verbatim string), and `Panel.tsx`/`GroupList.tsx`
+already render zero jump affordances on an all-chrome scan for free — every row's `OriginAffordance`
+independently renders the chrome label since every row's `origin === 'chrome'`. `page.tsx` never
+imported `ChromeOnly`; it was orphaned the moment TR-6 wired `Panel` in. Coverage for both assertions
+("Every one of them is site chrome…" and zero jump buttons on an all-chrome scan) already exists in
+`verdict.test.ts`, `VerdictHead.test.tsx` and `Panel.test.tsx`, so removing the file and its test
+loses no test coverage — it removes an unreferenced component nothing in the shipped tree calls
+(rule 88: a thing that exists and nothing uses is a defect, not a spare).
 
 **T039 — M3 is a real-tenant number, not yet measured.** `computeAttributionRate`/`logAttributionRate`
 are wired into `usePageScan` and fire on every scan (console only, NFR-3), but no fixture on disk pairs
