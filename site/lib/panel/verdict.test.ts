@@ -11,6 +11,7 @@ function seed(overrides: Partial<LinkFinding>): LinkFinding {
     statuses: new Set<StatusMember>(),
     attribution: null,
     targetLabel: null,
+    targetItemId: null,
     origin: "content",
     ...overrides,
   };

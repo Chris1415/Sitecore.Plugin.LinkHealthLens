@@ -17,6 +17,7 @@ function finding(overrides: Partial<LinkFinding>): LinkFinding {
     statuses: new Set(),
     attribution: null,
     targetLabel: null,
+    targetItemId: null,
     ...overrides,
   };
 }
@@ -113,6 +114,41 @@ describe("resolveInternalFindings", () => {
 
     expect(result[0].statuses.size).toBe(0);
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("populates targetItemId with the resolved PAGE's item id — the id the owner-and-open control navigates to (regression, defect fixed 2026-09-02)", async () => {
+    const { stubClient, mutate } = createStubClient();
+    mutate.mockImplementation((async (key: string) => {
+      if (key === "xmc.authoring.graphql") {
+        return { data: { data: { item: { itemId: "PAGE-ITEM-ID", name: "Models" } } } };
+      }
+      return { data: { data: { item: { id: "live-1" } } } };
+    }) as never);
+
+    const findings = [finding({ href: "/models", ordinal: 1 })];
+    const { findings: result } = await resolveInternalFindings(findings, CTX(stubClient));
+
+    expect(result[0].targetItemId).toBe("PAGE-ITEM-ID");
+  });
+
+  it("a not-found or could-not-check path never carries a targetItemId — there is no page to navigate to", async () => {
+    const { stubClient, mutate } = createStubClient();
+    mutate.mockImplementation((async (key: string, opts: { params: { body: { variables: { path: string } } } }) => {
+      if (key === "xmc.authoring.graphql") {
+        if (opts.params.body.variables.path === `${ROOT}/missing`) return { data: { data: { item: null } } };
+        throw new Error("network");
+      }
+      return { data: { data: { item: { id: "live-1" } } } };
+    }) as never);
+
+    const findings = [
+      finding({ href: "/missing", ordinal: 1 }),
+      finding({ href: "/fails", ordinal: 2 }),
+    ];
+    const { findings: result } = await resolveInternalFindings(findings, CTX(stubClient));
+
+    expect(result[0].targetItemId).toBeNull();
+    expect(result[1].targetItemId).toBeNull();
   });
 
   it("non-internal findings are left untouched", async () => {

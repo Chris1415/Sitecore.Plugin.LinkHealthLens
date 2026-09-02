@@ -30,6 +30,7 @@ function seed(overrides: Partial<LinkFinding>): LinkFinding {
     statuses: new Set<StatusMember>(["ok"]),
     attribution: null,
     targetLabel: null,
+    targetItemId: null,
     origin: "content",
     ...overrides,
   };

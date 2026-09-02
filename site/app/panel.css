@@ -187,6 +187,10 @@
 }
 
 .lhl-rows { list-style: none; margin: 0; padding: 0 0 4px; }
+/* Ungrouped rendering for the sole-clean-group case (2026-09-02 defect fix,
+   docs/build-decisions.md § clean-state group wrapper) — no collapsible
+   header exists here, so the rows need their own top spacing. */
+.lhl-rows-flat { padding-top: 4px; }
 
 /* --- a finding row: one anchor, always exactly one row (ADR-0005) ------- */
 
@@ -258,8 +262,12 @@
 
 /* --- the three-way origin affordance (ADR-0006) ------------------------ */
 
-.lhl-origin { margin-top: 7px; display: flex; align-items: flex-start; gap: 6px; }
+.lhl-origin { margin-top: 7px; display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; }
 .lhl-origin .lhl-i { flex: 0 0 auto; margin-top: 2px; color: var(--muted-foreground); }
+/* Owner label (icon + text) and the navigate control are independent
+   signals since the 2026-09-02 fix (docs/build-decisions.md § OriginAffordance
+   owner/navigate split) — the control gets its own row when both are present. */
+.lhl-jump-wrap { flex: 1 1 100%; }
 
 .lhl-jump {
   font: inherit;

@@ -1,15 +1,18 @@
 "use client";
 
-// T038 — the three-way origin affordance (FR-15 / AC-7.2 / AC-7.3 / AC-7.5).
-// Exactly one of three per row, mutually exclusive by construction (a single
-// `return`, never a class-toggle over all three markups): (1) content +
-// attributed -> JumpAction (T037); (2) content + unattributed -> the fixed
-// "field not identified" string; (3) chrome -> the fixed "site chrome"
-// string. The two label strings are exported constants (lib/panel/copy.ts)
-// so a "fixed string" cannot quietly diverge between this file and its test.
-// Applying the chrome string to a content link is an automatic Critical
-// (§ 4c-1) — the branch on `finding.origin` below is what makes that
-// impossible to get backwards.
+// T038 — the origin affordance (FR-15 / AC-7.2 / AC-7.3 / AC-7.5). Amended
+// 2026-09-02 (ADR-0010 amendment, docs/build-decisions.md § OriginAffordance
+// owner/navigate split): the OWNER LABEL and the NAVIGATE control are two
+// independent signals, not one three-way switch. `chrome` origin still
+// renders only the fixed chrome string (ADR-0006 — unchanged, no control).
+// For `content` origin: the owner label always renders as TEXT — the
+// attributed field path, or the "field not identified" fallback — and is
+// never itself a navigation target (it names *where the link lives*, per
+// ADR-0010). The JumpAction button renders independently, gated ONLY on
+// whether TR-4 resolved the link to a real target PAGE (`targetItemId`) —
+// never on whether attribution succeeded, since a resolved page is useful
+// ("this points at an unpublished page — go look") even when its owning
+// rendering could not be determined.
 import { FileSearch, LayoutTemplate } from "lucide-react";
 import type { LinkFinding } from "@/lib/model/types";
 import { ORIGIN_CHROME_LABEL, ORIGIN_UNATTRIBUTED_LABEL } from "@/lib/panel/copy";
@@ -25,14 +28,15 @@ export function OriginAffordance({ finding }: { finding: LinkFinding }) {
     );
   }
 
-  if (!finding.attribution) {
-    return (
-      <div className="lhl-origin">
-        <FileSearch className="lhl-i" width={14} height={14} aria-hidden="true" />
-        <span className="lhl-label">{ORIGIN_UNATTRIBUTED_LABEL}</span>
-      </div>
-    );
-  }
+  const ownerLabel = finding.attribution?.fieldPath ?? null;
 
-  return <JumpAction attribution={finding.attribution} />;
+  return (
+    <div className="lhl-origin">
+      <FileSearch className="lhl-i" width={14} height={14} aria-hidden="true" />
+      <span className="lhl-label">{ownerLabel ?? ORIGIN_UNATTRIBUTED_LABEL}</span>
+      {finding.targetItemId && (
+        <JumpAction targetItemId={finding.targetItemId} targetLabel={finding.targetLabel} />
+      )}
+    </div>
+  );
 }

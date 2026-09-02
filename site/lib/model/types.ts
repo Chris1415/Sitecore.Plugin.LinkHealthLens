@@ -36,6 +36,12 @@ export interface LinkFinding {
   attribution: { fieldPath: string; target: unknown } | null;
   /** TR-4 (AC-3.2). Resolved page name, when known. */
   targetLabel: string | null;
+  /** TR-4 — the CM item id of the link's resolved TARGET PAGE (call 1 of
+   * ADR-0009), null until resolution runs or when it fails/excludes. This is
+   * the ONLY id the owner-and-open control may navigate to — never
+   * `attribution.target`, which names the *owning datasource*, not a page
+   * (defect fixed 2026-09-02: ADR-0010 amended, see docs/build-decisions.md). */
+  targetItemId: string | null;
 }
 
 export interface PageScan {

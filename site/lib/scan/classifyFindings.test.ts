@@ -8,7 +8,7 @@ import { classifyFindings } from "./classifyFindings";
 import type { LinkFinding } from "@/lib/model/types";
 
 function seed(href: string, ordinal = 1): LinkFinding {
-  return { href, ordinal, text: "", statuses: new Set(), attribution: null, targetLabel: null };
+  return { href, ordinal, text: "", statuses: new Set(), attribution: null, targetLabel: null, targetItemId: null };
 }
 
 describe("classifyFindings", () => {

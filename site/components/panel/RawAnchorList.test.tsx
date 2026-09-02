@@ -6,7 +6,7 @@ import type { LinkFinding } from "@/lib/model/types";
 import { RawAnchorList } from "./RawAnchorList";
 
 function seed(href: string, ordinal: number, text: string): LinkFinding {
-  return { href, ordinal, text, statuses: new Set(), attribution: null, targetLabel: null };
+  return { href, ordinal, text, statuses: new Set(), attribution: null, targetLabel: null, targetItemId: null };
 }
 
 describe("RawAnchorList", () => {

@@ -5,10 +5,16 @@
 // never attribution-derived — that is the whole point (ADR-0006 § M3): an
 // attribution-derived denominator would make this metric 100% by
 // construction and unfailable, which is exactly the defect the ADR exists
-// to remove. A "working" control additionally requires a non-empty
-// `target.itemId` — an attribution object whose target the jump control
-// itself would refuse to render (JumpAction returns null with no itemId)
-// does not count as working.
+// to remove.
+//
+// AMENDED 2026-09-02 (ADR-0010 amendment): "working" now means what
+// `OriginAffordance` actually renders a button for — a resolved TARGET PAGE
+// id (`finding.targetItemId`, from TR-4's `resolveInternal`) — NOT whether
+// `attribute()` produced an owning-datasource attribution. The two are
+// independent signals since the fix; measuring the wrong one here would
+// silently drift the metric from the UI it is supposed to describe (rule
+// 88). Requires this to run over TR-4-resolved findings (post
+// `resolveInternalFindings`), same call site as before.
 import type { LinkFinding } from "@/lib/model/types";
 
 export interface AttributionRate {
@@ -19,22 +25,10 @@ export interface AttributionRate {
   rate: number;
 }
 
-function hasWorkingItemId(target: unknown): boolean {
-  return (
-    typeof target === "object" &&
-    target !== null &&
-    "itemId" in target &&
-    typeof (target as { itemId: unknown }).itemId === "string" &&
-    (target as { itemId: string }).itemId.length > 0
-  );
-}
-
 export function computeAttributionRate(findings: LinkFinding[]): AttributionRate {
   const contentFindings = findings.filter((f) => f.origin === "content");
   const denominator = contentFindings.length;
-  const numerator = contentFindings.filter(
-    (f) => f.attribution !== null && hasWorkingItemId(f.attribution.target),
-  ).length;
+  const numerator = contentFindings.filter((f) => f.targetItemId !== null).length;
 
   return { numerator, denominator, rate: denominator === 0 ? 0 : numerator / denominator };
 }

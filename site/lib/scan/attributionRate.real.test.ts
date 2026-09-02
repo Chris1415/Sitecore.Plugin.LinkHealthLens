@@ -10,9 +10,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createStubClient } from "@/test/client-stub";
 import { extractAnchors } from "./extractAnchors";
 import { classifyFindings } from "./classifyFindings";
 import { computeAttributionRate } from "./attributionRate";
+import { resolveInternalFindings } from "./resolveFindings";
 
 function readCapture(name: string): unknown {
   const raw = readFileSync(
@@ -46,15 +48,71 @@ describe("M3 against the real Velaro Home DEVREL capture pair", () => {
     expect(attributed.length).toBeGreaterThan(0);
   });
 
+  // Regression (defect fixed 2026-09-02, ADR-0010 amended): "Open in canvas"
+  // navigated to attribute()'s datasource id — a datasource, which
+  // `pages.context` cannot open. The fix runs TR-4 resolution over the real
+  // captured page and asserts every id an owner-and-open control would hand
+  // to `client.mutate('pages.context', ...)` is a resolved PAGE id
+  // (`targetItemId`), and specifically that it is never one of the real
+  // datasource guids the paired presentationDetails fixture carries.
+  it("resolves every content link to a target PAGE id that is never a datasource id from presentationDetails (regression)", async () => {
+    const { stubClient, mutate } = createStubClient();
+    let pageCounter = 0;
+    mutate.mockImplementation((async (key: string, opts: unknown) => {
+      if (key === "xmc.authoring.graphql") {
+        pageCounter += 1;
+        return { data: { data: { item: { itemId: `RESOLVED-PAGE-${pageCounter}`, name: "Some Page" } } } };
+      }
+      if (key === "xmc.live.graphql") {
+        return { data: { data: { item: { id: "live-1" } } } };
+      }
+      throw new Error(`unexpected mutate key in test: ${key} ${JSON.stringify(opts)}`);
+    }) as never);
+
+    const datasourceIds = new Set(
+      ((presentationDetailsCapture.devices as { renderings?: { dataSource?: string }[] }[])[0]?.renderings ?? [])
+        .map((r) => r.dataSource)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    );
+    expect(datasourceIds.size).toBeGreaterThan(0); // sanity: the fixture actually carries datasource ids
+
+    const seeded = classifyFindings(extractAnchors(html), html, presentationDetailsRaw);
+    const { findings } = await resolveInternalFindings(seeded, {
+      siteRootPath: "/sitecore/content/Velaro/Velaro/Home",
+      language: "en",
+      client: stubClient,
+      authoringContextId: "ctx-preview",
+      liveContextId: "ctx-live",
+    });
+
+    const navigable = findings.filter((f) => f.targetItemId !== null);
+    expect(navigable.length).toBeGreaterThan(0);
+    for (const f of navigable) {
+      expect(datasourceIds.has(f.targetItemId!)).toBe(false);
+      // The two ids genuinely differ when both are present on the same row —
+      // the exact case that shipped broken (owner attributed, button used
+      // attribution.target.itemId instead of this resolved id).
+      if (f.attribution) {
+        const owningDatasourceId = (f.attribution.target as { itemId?: string }).itemId;
+        expect(f.targetItemId).not.toBe(owningDatasourceId);
+      }
+    }
+  });
+
   it("measures M3 (>= 50% is the A3 threshold — reported, not enforced, here)", () => {
     const findings = classifyFindings(extractAnchors(html), html, presentationDetailsRaw);
     const rate = computeAttributionRate(findings);
     console.info(
       `[T041 real-fixture M3] ${rate.numerator}/${rate.denominator} (${(rate.rate * 100).toFixed(1)}%)`,
     );
+    // AMENDED 2026-09-02: M3's numerator now counts resolved target PAGES
+    // (targetItemId), not structural attribution — see attributionRate.ts.
+    // classifyFindings alone never populates targetItemId (that is TR-4's
+    // job, exercised in the regression test above), so over this seed-only
+    // pipeline the rate is honestly 0 — not a claim about the shipped app.
     expect(rate.denominator).toBe(10);
-    expect(rate.numerator).toBe(10);
-    expect(rate.rate).toBe(1);
+    expect(rate.numerator).toBe(0);
+    expect(rate.rate).toBe(0);
   });
 
   it("sanity-checks the structural origin split against the page's own chrome/content landmarks", () => {

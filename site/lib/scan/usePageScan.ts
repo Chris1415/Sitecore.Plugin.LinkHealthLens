@@ -55,6 +55,16 @@ export function usePageScan(): UsePageScanResult {
 
     const runScan = async (ctx: PagesContext) => {
       const thisScanId = ++scanIdRef.current;
+      // Diagnostic only (2026-09-02, operator report investigation) — proves
+      // in the live portal console whether `pages.context`'s subscribe
+      // callback actually re-fires on a page-selection change. Console-only,
+      // never persisted (NFR-3); safe to leave in, same discipline as the
+      // existing M1/M3 console logs below.
+      console.debug("[link-health-lens] pages.context callback fired", {
+        scanId: thisScanId,
+        pageId: ctx.pageInfo?.id,
+        at: Date.now(),
+      });
       // FR-4/AC-1.3: every prior finding is gone before the new scan starts —
       // synchronous with entering loading, not eventually consistent.
       setScan(null);

@@ -11,6 +11,7 @@ function seed(overrides: Partial<LinkFinding>): LinkFinding {
     statuses: new Set(),
     attribution: null,
     targetLabel: null,
+    targetItemId: null,
     ...overrides,
   };
 }
@@ -20,7 +21,7 @@ describe("computeAttributionRate", () => {
     const findings = [
       seed({ origin: "chrome" }),
       seed({ origin: "chrome" }),
-      seed({ origin: "content", attribution: { fieldPath: "a", target: { itemId: "1" } } }),
+      seed({ origin: "content", targetItemId: "page-1" }),
     ];
     const result = computeAttributionRate(findings);
     expect(result.denominator).toBe(1);
@@ -28,11 +29,11 @@ describe("computeAttributionRate", () => {
     expect(result.rate).toBe(1);
   });
 
-  it("does NOT shrink the denominator when attribution fails — the metric can genuinely fail", () => {
+  it("does NOT shrink the denominator when a link has no resolved target — the metric can genuinely fail", () => {
     const findings = [
-      seed({ origin: "content", attribution: null }),
-      seed({ origin: "content", attribution: null }),
-      seed({ origin: "content", attribution: { fieldPath: "a", target: { itemId: "1" } } }),
+      seed({ origin: "content", targetItemId: null }),
+      seed({ origin: "content", targetItemId: null }),
+      seed({ origin: "content", targetItemId: "page-1" }),
     ];
     const result = computeAttributionRate(findings);
     expect(result.denominator).toBe(3);
@@ -46,8 +47,17 @@ describe("computeAttributionRate", () => {
     expect(result).toEqual({ numerator: 0, denominator: 0, rate: 0 });
   });
 
-  it("an attribution object with no working itemId does not count as a working control", () => {
-    const findings = [seed({ origin: "content", attribution: { fieldPath: "a", target: {} } })];
+  it("counts a resolved target page as working even when the owning field/rendering was never attributed (defect fixed 2026-09-02 — the two signals are independent)", () => {
+    const findings = [seed({ origin: "content", attribution: null, targetItemId: "page-1" })];
+    const result = computeAttributionRate(findings);
+    expect(result.numerator).toBe(1);
+    expect(result.denominator).toBe(1);
+  });
+
+  it("an attributed field with no resolved target page does NOT count as working — attribution alone cannot be navigated to", () => {
+    const findings = [
+      seed({ origin: "content", attribution: { fieldPath: "a", target: { itemId: "datasource-1" } }, targetItemId: null }),
+    ];
     const result = computeAttributionRate(findings);
     expect(result.numerator).toBe(0);
     expect(result.denominator).toBe(1);

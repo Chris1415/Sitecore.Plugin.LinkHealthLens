@@ -33,6 +33,11 @@ export interface ResolveFindingsOutcome {
 interface PathOutcome {
   statuses: StatusMember[];
   targetLabel: string | null;
+  /** The resolved target PAGE's item id (call 1's `itemId`) — the only id
+   * the owner-and-open control is allowed to navigate to (defect fix
+   * 2026-09-02: previously the button used the owning datasource's id from
+   * `attribute()`, which `pages.context` cannot open). */
+  targetItemId: string | null;
 }
 
 export async function resolveInternalFindings(
@@ -68,12 +73,12 @@ export async function resolveInternalFindings(
     });
 
     if (call1.status === "not-found") {
-      outcomes.set(path, { statuses: ["not-found"], targetLabel: null });
+      outcomes.set(path, { statuses: ["not-found"], targetLabel: null, targetItemId: null });
       return;
     }
     if (call1.status === "could-not-check") {
       resolutionFailures++;
-      outcomes.set(path, { statuses: ["could-not-check"], targetLabel: null });
+      outcomes.set(path, { statuses: ["could-not-check"], targetLabel: null, targetItemId: null });
       return;
     }
     // "excluded" cannot occur here — the grouping step above already filtered it.
@@ -90,7 +95,10 @@ export async function resolveInternalFindings(
 
     if (verdict === "could-not-check") liveCheckFailures++;
     const statuses: StatusMember[] = verdict === "published" ? [] : [verdict];
-    outcomes.set(path, { statuses, targetLabel: call1.name });
+    // call1.itemId is the resolved TARGET PAGE's id — kept even when the
+    // live-state check itself failed or reports unpublished, since the item
+    // still exists and is still a valid navigation target.
+    outcomes.set(path, { statuses, targetLabel: call1.name, targetItemId: call1.itemId });
   });
 
   const resolvedFindings = findings.map((finding) => {
@@ -101,7 +109,7 @@ export async function resolveInternalFindings(
     if (!outcome) return finding;
     const statuses = new Set(finding.statuses);
     for (const member of outcome.statuses) statuses.add(member);
-    return { ...finding, statuses, targetLabel: outcome.targetLabel };
+    return { ...finding, statuses, targetLabel: outcome.targetLabel, targetItemId: outcome.targetItemId };
   });
 
   const health = {

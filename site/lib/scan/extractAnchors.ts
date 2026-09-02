@@ -22,6 +22,7 @@ export function extractAnchors(html: string): LinkFinding[] {
       statuses: new Set(),
       attribution: null,
       targetLabel: null,
+      targetItemId: null,
     };
   });
 }
