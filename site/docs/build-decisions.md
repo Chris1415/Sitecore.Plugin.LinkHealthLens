@@ -646,3 +646,78 @@ the run brief's "the word ban applies to UI copy, not to code identifiers."
 for the ready state, not `RawAnchorList` directly. Left in place (with its own passing test) rather than
 deleted: it is TR-2's real T1-exit evidence (the raw anchor list rendering in the canvas before any
 classification existed), and removing it would erase that record for no functional gain.
+
+## Defect fixes — 2026-09-02 (operator-reported, live portal)
+
+**§ JumpAction navigation target — CRITICAL, "Open in canvas" errored.** The shipped control called
+`client.mutate('pages.context', { itemId })` with `attribute()`'s `target.itemId` — an owning
+**datasource** id sourced from `presentationDetails[].dataSource`. `pages.context` opens pages, not
+datasources; the click produced an error page. ADR-0010's own probe evidence never covered this: it
+verified the mutation against the *current page's* id (a page), and the Decision generalized to
+"navigate to the owning item" without re-testing against a datasource id specifically. Full root cause
+and correction: ADR-0010's "Correction (2026-09-02)" section, PRD-000 Amendment 2.
+
+Fix, mechanically: TR-4's `resolveInternal` (ADR-0009 call 1) already resolves every internal link to
+its **target page** item id — previously computed and then discarded (`resolveFindings.ts` stored only
+`targetLabel`, the resolved name, never the id). Added `LinkFinding.targetItemId` (`lib/model/types.ts`)
+and threaded it through `resolveFindings.ts`. `JumpAction` (`components/panel/JumpAction.tsx`) now takes
+`{ targetItemId, targetLabel }` — a genuine page id — and never sees `attribution` at all.
+
+**§ OriginAffordance owner/navigate split.** The owner label (from `attribute()`, structural
+rendering+datasource attribution) and the navigate control are now two INDEPENDENT signals, not one
+three-way switch gated on attribution:
+
+- `chrome` origin: unchanged — the fixed chrome string only, no control (ADR-0006).
+- `content` origin: **always** renders the owner label as text (attributed field path, or the fixed
+  "field not identified" string) — this text is informational, "where the link lives", never itself
+  clickable — and **separately** renders `JumpAction` iff `finding.targetItemId` is non-null, regardless
+  of whether attribution succeeded. A content link whose owning rendering could not be attributed but
+  whose target page WAS resolved now still gets a working control ("this points at an unpublished page
+  — go look"); an attributed link whose target could not be resolved (external, in-page anchor, media,
+  unresolved) gets no control at all.
+
+**§ M3 metric corrected to match.** `computeAttributionRate` (`lib/scan/attributionRate.ts`) previously
+counted `attribution !== null && hasWorkingItemId(attribution.target)` — i.e. it measured the OLD,
+broken control's precondition. It now counts `targetItemId !== null` over structurally-`content`
+findings — what the control actually renders for post-fix. Left unchanged would have kept reporting a
+rate for a gating condition the UI no longer uses.
+
+**Regression coverage** (rule 30 — RED before this fix would have caught it): `resolveFindings.test.ts`
+asserts `targetItemId` is populated with the resolved page id and stays null on a failed/not-found
+resolution; `attributionRate.real.test.ts` runs the full pipeline (`extractAnchors` ->
+`classifyFindings` -> `resolveInternalFindings`) over the real captured Velaro Home page + its paired
+`presentationDetails` fixture and asserts every navigable finding's `targetItemId` is **never** one of
+the fixture's real datasource guids, and differs from `attribution.target.itemId` whenever a row
+carries both — the exact shape that shipped broken. `JumpAction.test.tsx` / `OriginAffordance.test.tsx`
+were rewritten to the new prop contract and independence rules.
+
+## Defect fix — clean-state row/group noise (2026-09-02, operator-reported)
+
+**Observed:** an all-clean page rendered every row with a redundant "No findings" chip, inside a
+collapsible "No findings" group header with its own count badge — noise repeated once per row and once
+more on the group, when the verdict line above already says the page is clean.
+
+**Verified against the POC first, per rule 88 ("gate is broken" needs the same bar):** `state-clean.html`
++ `panel.js`'s `cleanFindings()`/`renderChips` render the identical shape — every clean row gets an
+explicit "No findings" `STATUS.ok` chip, and the "No findings" group renders as an ordinary collapsible
+section. **The app is faithful to the POC here; this is a POC design gap that survived the design gate,
+not a porting defect.** The POC is the historical record of what was chosen and is left unedited; this
+build deliberately diverges from it.
+
+**Fix 1 — `StatusChips` drops the `ok` chip.** `ok` is never an added Set member in production code
+(`headlineOf`'s own fallback for an empty status set, per `precedence.ts`) — a clean row's "finding" was
+always synthetic. `ordered` now omits `head` when `head === 'ok'`; the standing
+`reachability-not-checked` note (on an otherwise-clean external row) still renders exactly as before,
+since it is unconditionally pushed regardless of `head`. `isHeadline` had to move from a positional
+`i === 0` check to `member === head && head !== 'ok'`, or the note would inherit headline styling it
+never earned once it could land at index 0 alone.
+
+**Fix 2 — `GroupList` renders the sole `no-findings` group flat, with no collapsible wrapper.** When
+exactly one group is non-empty AND it is `no-findings`, `GroupList` renders its rows directly (no
+header, no chevron, no name/count badge) instead of the ordinary `Group` disclosure. Any OTHER
+combination — including a clean page that also carries a non-empty `external` group — still renders the
+normal grouped, collapsible list; the flat form is specifically the "literally nothing to disclose"
+case.
+
+Both fixes are pure presentation — no change to `classifyFindings`, `groupOf`, or the underlying
+`LinkFinding` data.

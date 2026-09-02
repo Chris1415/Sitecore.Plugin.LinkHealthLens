@@ -3,7 +3,50 @@
 ## Status
 
 Accepted — **narrows ADR-0003's jump-action clause.** The rendered-page scope, the best-effort
-attribution posture and the three-way label are all unchanged.
+attribution posture and the three-way label are all unchanged. **Amended 2026-09-02 — see
+"Correction" below: the Decision as originally written named the wrong navigation TARGET.**
+
+## Correction (2026-09-02) — the Decision navigated to the wrong item
+
+**Live defect, operator-reported, CRITICAL.** The shipped control called
+`client.mutate('pages.context', { itemId })` with `attribute()`'s `target.itemId` — the **owning
+datasource's** id (`presentationDetails[].dataSource`). A datasource is not a page. `pages.context`
+opens pages; asked to open a datasource it produced an error page in the live portal.
+
+**Root cause: the probe evidence above never actually tested this.** It confirmed
+`client.mutate('pages.context', { itemId: <current> })` succeeds — but `<current>` was the *page
+already open*, itself a page. The Decision then generalized to "navigate to the owning item" and
+implemented it with a **datasource** id, a generalization the probe never covered. `presentationDetails`
+*also* gives the panel something that IS a page-navigable id, sitting one hop away: TR-4's
+`resolveInternal` (ADR-0009 call 1) already resolves every internal link's **target page**, and that
+id was sitting unused in `LinkFinding.targetItemId`.
+
+**The Decision is corrected, not the mechanism named above:**
+
+1. **Names the owner** — unchanged, still rendering + datasource, from `presentationDetails`. Now
+   rendered as **text only**, never as, or attached to, the navigation control.
+2. **Offers navigation to the link's resolved TARGET PAGE** (`LinkFinding.targetItemId`) via
+   `client.mutate('pages.context', { itemId })` — the id ADR-0009's `resolveInternal` already produces
+   for every internal link, and the only id in this app that is provably a page (Authoring GraphQL's
+   `item.itemId` for a path lookup that HIT).
+3. **The two are independent signals.** A content link with a resolved target page gets the control
+   **even when its owning rendering could not be attributed** — "this points at an unpublished page,
+   go look at it" needs no owner. Conversely an attributed link whose target could not be resolved
+   (external, in-page anchor, unresolved) gets **no** control — attribution alone is not navigable.
+
+**M3 is corrected to match:** the numerator now counts content-origin findings with a non-null
+`targetItemId` — what the control actually renders for — not structural attribution. Measuring
+attribution success (the pre-correction definition) would report a rate for a control that, per this
+correction, does not gate on attribution at all.
+
+**Consequence for the "one honest limit" below:** unchanged in spirit, sharper in practice — the
+editor is now taken to the actual page the link points at (which may differ from the rendering's OWN
+datasource entirely, e.g. a nav link inside one rendering pointing at an unrelated page), and still has
+to locate the field within it.
+
+Full mechanism + tests: `docs/build-decisions.md` § JumpAction navigation target /
+§ OriginAffordance owner/navigate split. PRD-000 Amendment 2 and `prd-minimal-000.md`'s
+non-negotiables carry the same correction.
 
 ## Context
 
