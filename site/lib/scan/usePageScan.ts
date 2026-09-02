@@ -20,6 +20,15 @@ export interface UsePageScanResult {
   scan: PageScan | null;
 }
 
+// A field edit is how an author FIXES a broken link — the panel not noticing
+// was the reported defect. `fieldsUpdated` fires as the editor types, so a
+// re-scan (page-HTML fetch + up to two SDK calls per internal anchor) is
+// debounced to the last event in a burst, never fired per keystroke. Operator
+// chose debounce-and-coalesce over field-filtering (any rich-text field can
+// carry an anchor, so a filter would eventually go silently stale) and over a
+// manual button (pushes the work back onto the author).
+const CONTENT_CHANGE_DEBOUNCE_MS = 600;
+
 function pagePartsOf(ctx: PagesContext) {
   return {
     id: ctx.pageInfo?.id ?? "",
@@ -46,12 +55,40 @@ export function usePageScan(): UsePageScanResult {
   const [scan, setScan] = useState<PageScan | null>(null);
   // Guards a slow HTML fetch resolving after a newer selection already reset
   // state — the reset in runScan is synchronous; this stops a stale response
-  // from clobbering it (belt-and-braces for FR-4).
+  // from clobbering it (belt-and-braces for FR-4). Also covers a debounced
+  // content re-scan racing a newer page selection — every trigger funnels
+  // through the same runScan/scanIdRef pair.
   const scanIdRef = useRef(0);
+  // Most recent pages.context payload — content-change events carry no page
+  // context of their own, so a debounced re-scan re-runs against this.
+  const latestCtxRef = useRef<PagesContext | undefined>(undefined);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeFields: (() => void) | undefined;
+    let unsubscribeLayout: (() => void) | undefined;
     let cancelled = false;
+
+    const clearPendingDebounce = () => {
+      if (debounceTimerRef.current !== undefined) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = undefined;
+      }
+    };
+
+    // Coalesces a burst of content-change events into one re-scan, fired
+    // CONTENT_CHANGE_DEBOUNCE_MS after the LAST event — ten events in quick
+    // succession reset this timer nine times and fire once.
+    const scheduleContentRescan = () => {
+      clearPendingDebounce();
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = undefined;
+        if (cancelled) return;
+        const ctx = latestCtxRef.current;
+        if (ctx) void runScan(ctx);
+      }, CONTENT_CHANGE_DEBOUNCE_MS);
+    };
 
     const runScan = async (ctx: PagesContext) => {
       const thisScanId = ++scanIdRef.current;
@@ -148,20 +185,59 @@ export function usePageScan(): UsePageScanResult {
       .query("pages.context", {
         subscribe: true,
         onSuccess: (ctx) => {
+          latestCtxRef.current = ctx;
+          // A page-selection change is not the same class of event as a
+          // content edit and must not sit behind the content debounce — it
+          // re-scans immediately, and drops any pending debounced re-scan
+          // rather than letting a stale one fire moments later.
+          clearPendingDebounce();
           void runScan(ctx);
         },
       })
       .then((res) => {
         unsubscribe = res.unsubscribe;
-        if (res.data) void runScan(res.data);
+        if (res.data) {
+          latestCtxRef.current = res.data;
+          void runScan(res.data);
+        }
       })
       .catch(() => {
         if (!cancelled) setStatus("error");
       });
 
+    // Fail-soft (NFR-2 discipline extended to this trigger): either
+    // subscription failing to establish must leave the page-change path
+    // fully intact, never blank the panel. `client.subscribe` per the SDK
+    // returns a teardown synchronously; guard the call itself in case a
+    // given host/module combination throws instead of rejecting.
+    try {
+      unsubscribeFields = client.subscribe("pages.content.fieldsUpdated", {
+        onData: () => scheduleContentRescan(),
+        onError: (err) => {
+          console.error("[link-health-lens] pages.content.fieldsUpdated subscription error", err);
+        },
+      });
+    } catch (err) {
+      console.error("[link-health-lens] failed to subscribe to pages.content.fieldsUpdated", err);
+    }
+
+    try {
+      unsubscribeLayout = client.subscribe("pages.content.layoutUpdated", {
+        onData: () => scheduleContentRescan(),
+        onError: (err) => {
+          console.error("[link-health-lens] pages.content.layoutUpdated subscription error", err);
+        },
+      });
+    } catch (err) {
+      console.error("[link-health-lens] failed to subscribe to pages.content.layoutUpdated", err);
+    }
+
     return () => {
       cancelled = true;
+      clearPendingDebounce();
       unsubscribe?.();
+      unsubscribeFields?.();
+      unsubscribeLayout?.();
     };
   }, [client, contextId, liveContextId]);
 

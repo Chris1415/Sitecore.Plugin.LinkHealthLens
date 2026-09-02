@@ -721,3 +721,47 @@ case.
 
 Both fixes are pure presentation — no change to `classifyFindings`, `groupOf`, or the underlying
 `LinkFinding` data.
+
+## Enhancement — react to content edits too (2026-09-02, operator-requested)
+
+**Observed:** the panel re-scans on page selection but not on a field edit — an author fixing a broken
+link never saw the panel update. Confirmed as correct behaviour to change: a field edit is exactly how
+someone fixes a broken link, so the panel not noticing defeats the tool.
+
+`usePageScan` now also subscribes to the two `SubscribeMap` events (`marketplace-sdk-client` §
+6/`references/subscriptions.md`) — `pages.content.fieldsUpdated` and `pages.content.layoutUpdated` — and
+re-runs the SAME `runScan` used for page selection. Operator picked **debounce-and-coalesce**
+(600ms after the last event) over the two alternatives named in the brief: filtering by which field
+changed (rejected — any rich-text field can carry an anchor, so a filter eventually goes silently stale)
+and a manual "rescan" button (rejected — pushes the work back onto the author). `fieldsUpdated` fires per
+keystroke; a re-scan is a page-HTML fetch plus up to two SDK calls per internal anchor, so an undebounced
+re-scan would hammer the tenant on a 59-anchor page.
+
+**One re-scan trigger, one code path.** Content events carry no `PagesContext` of their own, so
+`latestCtxRef` holds the most recent one (updated on every `pages.context` payload) and the debounced
+timer re-runs `runScan(latestCtxRef.current)`. This means the existing `scanIdRef` stale-response guard —
+built for the page-change race — covers the new trigger for free; nothing new was needed there
+(`usePageScan.test.tsx`'s stale-guard test asserts this explicitly rather than trusting it by
+inspection).
+
+**A page change is a different class of event and jumps the debounce queue.** `onSuccess` for
+`pages.context` clears any pending content-debounce timer before calling `runScan` immediately — a
+selection must never sit behind a content edit's wait window, and a stale debounced re-scan for the OLD
+page must never fire moments after the author has already moved on.
+
+**Fail-soft, per NFR-2's existing discipline.** Each `client.subscribe(...)` call is wrapped in its own
+try/catch (`console.error`, no UI change) — an extension point that cannot support one or both content
+events must still leave page-change re-scanning fully working, never a blank panel. Teardown clears the
+pending timer and calls both unsubscribe functions; a timer firing after unmount would be a real leak (an
+async `setState` on an unmounted hook) — the debounce callback checks the effect's own `cancelled` flag
+before doing anything.
+
+**No new loading affordance.** The existing `status: 'loading'` transition IS the "visible, not silent"
+signal (`runScan` already resets `scan`/`status` synchronously at the top) — the debounce itself is what
+keeps this from flickering on every keystroke, since the loading transition only fires once per coalesced
+burst, not once per event.
+
+Five new tests in `usePageScan.test.tsx` (fake timers, `vi.advanceTimersByTimeAsync`): ten rapid
+`fieldsUpdated` events coalesce to one re-scan; a page change re-scans immediately with a content debounce
+pending; the stale-guard drops a superseded debounced scan; unmount cancels the pending timer and
+unsubscribes both events; a throwing `subscribe()` still leaves page-change re-scanning intact.
