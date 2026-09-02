@@ -2,7 +2,7 @@
   "schema_version": 8,
   "run_id": "20260831T143222Z",
   "created_at": "2026-08-31T14:32:22Z",
-  "updated_at": "2026-09-02T09:00:00Z",
+  "updated_at": "2026-09-02T11:30:00Z",
   "product_slug": "link-health-lens",
   "product_root": "products/marketplace/link-health-lens",
   "products_root_abs": null,
@@ -56,7 +56,7 @@
   "variables": {
     "mode": "client-side"
   },
-  "status": "build_ready",
+  "status": "qa_ready",
   "// work_item_type — schema 8 discriminator": [
     "work_item_type is the keystone discriminator set at intake by /create-prd (prd), /create-frd (frd), or /create-bug (bug). Every downstream command reads it to pick the weight-preset, the operator-gate count (prd=2, frd=1, bug=0+valves), and which stages to skip (bug skips architect+UI; frd skips architect+UI unless an ADR-worthy decision or UI scope exists).",
     "SAME ARTIFACT SLOTS, DIFFERENT FILL. canonical_artifacts.prd / prd_minimal hold the SPEC and SPEC-MINIMAL regardless of type — for an FRD they point at frd-NNN.md / frd-minimal-NNN.md; for a bug at bug-NNN.md / bug-minimal-NNN.md. The slot names stay `prd` / `prd_minimal` so downstream read paths (esp. Developer-08's `prd_minimal + task_breakdown`) are unchanged. The misnomer is intentional and documented.",
@@ -181,7 +181,7 @@
     "task_breakdown_pre_qa": null,
     "qa_report": null,
     "code_review_report": null,
-    "test_report": null,
+    "test_report": "products/marketplace/link-health-lens/project-planning/plans/test-report-20260902T110000Z.md",
     "content_test_report": null,
     "interrogation_ledger": "products/marketplace/link-health-lens/project-planning/plans/interrogation-discovery-20260831T143222Z.md",
     "challenge_ledger": null,
@@ -364,7 +364,7 @@
     "status": "in_progress",
     "resumed_from_stage": null
   },
-  "next_action": "/test — integration pass over the whole build. The build-gate visual pass remains the operator's and is still open.",
+  "next_action": "Two operator items remain: the build-gate visual pass, and proving the checker fires (F2). Then /ship.",
   "// next_action — crash-resilience / resume field (schema 8+)": [
     "Written by EVERY stage/tranche/component close (alongside the stage_history entry + git commit — the per-unit checkpoint, rule 71-delivery-loop.mdc / 72-orchestrator-discipline.mdc). States the explicit next step in plain terms so a fresh orchestrator (after a crash/disconnect) knows exactly where to continue WITHOUT re-deriving it from context.",
     "/resume reads this after reconciling disk + git against the manifest (see .agent/commands/project/resume.md): diff reality → update the manifest to match → continue from next_action.",
@@ -499,6 +499,19 @@
       "major": "DEAD CODE — ChromeOnly.tsx (T040's deliverable) was orphaned once TR-6's VerdictHead/GroupList composition subsumed its behaviour; page.tsx never imported it. Removed with its test.",
       "orchestrator_verification": "Deleting a component AND its tests drops the count 246 -> 241, which is exactly how a coverage loss can pass as cleanup. Verified: the file is gone, zero references remain anywhere in app/components/lib/test, and the chrome-only behaviour is still asserted in verdict.test.ts, VerdictHead.test.tsx and Panel.test.tsx. Genuine dead-code removal.",
       "seven_targeted_checks": "All passed. Most important: origin is computed independently of attribution and is STRUCTURALLY unable to regress — classifyOrigin's signature takes no attribution input at all, so the rejected design cannot creep back through a side door. The bounded descent is 3 levels, single-child-wrapper only, and still refuses on mismatch."
+    },
+    "F1-live-edge-lead": {
+      "outcome": "RESOLVED — the lead works",
+      "method": "The orchestrator had the endpoint form wrong twice (sc_apikey header). The skill sitecoreai-edge-graphql-capture documents the context id as a QUERY PARAM with NO Authorization header: POST https://edge-platform.sitecorecloud.io/v1/content/api/graphql/v1?sitecoreContextId=<id>. With that form it works.",
+      "evidence": "Velaro Home present · Velaro/Home/Models present · Zephira Home present · KOVEN HOME ABSENT · a fabricated path ABSENT.",
+      "why_the_two_call_design_is_right": "Live Edge ALONE conflates 'unpublished' with 'does not exist' — Koven Home and the fabricated path both return null. Combined with the CM path lookup it is unambiguous: CM hit + Edge absent = EXISTS BUT NOT PUBLISHED; CM miss = target not found. So AC-3.3's merged label should not need to fire, and TR-4's fallback stays a fallback.",
+      "supersedes": "The earlier probe (b) ambiguity, where getLivePageState 404'd for both smoke pages and nothing distinguished 'not live' from 'params wrong'. Koven Home 404'd there because it is genuinely NOT PUBLISHED — the 404 was right and merely uninterpretable on its own."
+    },
+    "F2-smoke-page": {
+      "outcome": "CONFIRMED as a real gap — the estate is clean",
+      "measured": "Every link on Velaro Home resolves in CM and is present on live Edge (8 of 8, including the /Models vs /models case pair). Every tested Zephira target likewise (5 of 5: /book, /book/manage, /destinations/Accra, /destinations/Lisbon, /stories). So neither candidate page produces a single finding from ANY check — string or resolution.",
+      "consequence": "M4's control proves nothing, because control-clean and known-bad-clean are identical. The checker is NOT demonstrated to fire on anything.",
+      "what_a_bad_link_would_be": "Koven Home is UNPUBLISHED and nothing links to it. A link to it would produce 'exists but not published'. A link to a non-existent path would produce 'target not found'. Both are one authored link away."
     }
   },
   "// smoke_outcomes — category guidance": [
@@ -850,6 +863,20 @@
       "severity": "warn",
       "item": "BUILD GATE — your single visual pass, the one you batched. Restart the dev server (app/pages-context/page.tsx changed its import graph and Turbopack does not reliably hot-reload a removed top-level import), open the canvas URL, and compare the panel against poc-v1-prd000 at 320/360/400. The state-to-frame checklist is in notes.build_gate_checklist so it is a checklist rather than a hunt. ONE intended divergence: the Open-in-canvas label differs from the POC, because ADR-0010 replaced the jump-to-field affordance the POC was drawn against.",
       "status": "open"
+    },
+    {
+      "stage": "test",
+      "type": "decision",
+      "severity": "blocker",
+      "item": "[BLOCKER] F2 — the checker has never been observed to FIRE. Every link on both candidate pages resolves and is published, so control-clean and known-bad-clean are the same result and M4 proves nothing. CHEAPEST FIX, no API write by me: while the panel is open in the canvas, add ONE link to a non-existent page (or to Koven Home, which is unpublished) on any page you are editing, and watch the panel. That is authoring in the tool the app exists to serve, takes seconds, and proves the whole chain end to end. Alternatives: I author a test page via the API (a real-tenant write needing your consent), or we accept fixture-only coverage and record that the end-to-end smoke is synthetic.",
+      "status": "open"
+    },
+    {
+      "stage": "test",
+      "type": "concern",
+      "severity": "info",
+      "item": "F1 RESOLVED: the live-Edge lead works and the two-call composition is unambiguous. QA correctly kept AC-3.3 conditional given the evidence available at the time; that condition can now be discharged.",
+      "status": "resolved"
     }
   ],
   "// operator_attention — guidance": [
@@ -944,7 +971,8 @@
     "attribution_fix_constraints": "The fix must descend through single-child wrappers with a BOUNDED depth and keep the refusal rule. An unbounded search for any node whose child count matches would find coincidental matches — reintroducing exactly the guessing the refusal exists to prevent. It must not hard-code #content or any class name: that is this head app's markup, not a contract.",
     "tr6_two_real_bugs_caught": "The Developer reported two defects it hit rather than avoided by luck: a useEffect-based disclosure reset rejected by react-hooks/set-state-in-effect (a hard lint error, fixed with adjust-state-during-render), and a first-cut zero-client.mutate gate that failed immediately against real source. The second is the exact defect the brief warned about, caught by running the gate rather than reasoning about it.",
     "build_gate_checklist": "Panel state -> POC frame: default view -> index.html · each group -> group-<id>-{closed,open}.html · scope disclosure -> state-scope-open.html · after Open in canvas -> state-jumped-r1.html (label text intentionally DIFFERS from the POC per ADR-0010) · loading/error/no-links/clean/chrome-only -> the matching state-*.html · widths -> state-width-320.html / state-width-400.html.",
-    "rule88_instance_seven": "The orphaned ChromeOnly is the SEVENTH instance of rule 88's pattern in this run: something well-formed that nothing used. It was found only because the review was explicitly told to hunt for it in a 2,768-line diff. The others: pack.rules[] unread, the base-chain script with no caller, the /design brief's empty skills list, the export mirror sync, the red typecheck behind a green build, the SDK contract gate nothing could satisfy, and now a component nothing rendered."
+    "rule88_instance_seven": "The orphaned ChromeOnly is the SEVENTH instance of rule 88's pattern in this run: something well-formed that nothing used. It was found only because the review was explicitly told to hunt for it in a 2,768-line diff. The others: pack.rules[] unread, the base-chain script with no caller, the /design brief's empty skills list, the export mirror sync, the red typecheck behind a green build, the SDK contract gate nothing could satisfy, and now a component nothing rendered.",
+    "estate_is_clean_finding": "Worth stating for its own sake: across two brands and 13 tested link targets, every internal link resolves and is published. That is a genuine quality signal about the estate — and the reason this app cannot be proven on it."
   },
   "discovery_mode": "relayed",
   "discovery_questions_asked": 5,
