@@ -172,13 +172,15 @@ describe("usePageScan", () => {
     );
   });
 
-  // Regression (defect fixed 2026-09-02, docs/build-decisions.md) — real
-  // tenant repro: `/contact4` (does not exist) must surface `not-found`,
-  // `/models` (exists) must resolve a `targetItemId` so the "Open in canvas"
-  // control renders. Both go through the FULL chain: usePageScan reads
-  // `ctx.siteInfo.properties.rootPath`, passes it to resolveInternalFindings,
-  // which calls `xmc.authoring.graphql` with the real content-tree path.
-  it("resolves siteRootPath from the real nested siteInfo.properties shape end to end — MISS surfaces not-found, HIT gets a targetItemId", async () => {
+  // Regression (defect fixed 2026-09-02, docs/build-decisions.md — fourth
+  // shape/semantics misreading): `/contact4` (does not exist) must surface
+  // `not-found`, `/models` (exists) must resolve a `targetItemId` so the
+  // "Open in canvas" control renders. Both go through the FULL chain:
+  // usePageScan resolves `siteInfo.startItemId` to the START ITEM's own path
+  // (one call) and passes THAT to resolveInternalFindings — never the
+  // site-node `siteInfo.properties.rootPath`, whose children are
+  // Home/Media/Data/Dictionary/Presentation/Settings, not the routable tree.
+  it("resolves the START ITEM path from siteInfo.startItemId end to end — MISS surfaces not-found, HIT gets a targetItemId", async () => {
     const { stubClient, query, mutate } = createStubClient();
     let onSuccess: ((ctx: PagesContext) => void) | undefined;
     query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
@@ -186,15 +188,22 @@ describe("usePageScan", () => {
       return Promise.resolve({ data: undefined, unsubscribe: vi.fn() });
     }) as never);
 
-    const ROOT = "/sitecore/content/Velaro-Brand/Velaro";
+    const SITE_NODE_ROOT = "/sitecore/content/Velaro-Brand/Velaro"; // NOT the routable base
+    const START_ITEM_ID = "ef14cc17-5a0b-4c15-aa2a-98749073b5db";
+    const START_ITEM_PATH = `${SITE_NODE_ROOT}/Home`;
     const ctx: PagesContext = {
-      siteInfo: { language: "en", properties: { rootPath: ROOT } },
+      siteInfo: { language: "en", startItemId: START_ITEM_ID, properties: { rootPath: SITE_NODE_ROOT } },
       pageInfo: { id: "page-home", name: "Home", path: "/", language: "en" },
     };
 
-    mutate.mockImplementation((async (key: string, opts: { params: { body: { variables: { path: string } } } }) => {
+    mutate.mockImplementation((async (
+      key: string,
+      opts: { params: { body: { variables: { itemId?: string; path?: string } } } },
+    ) => {
       if (key === "xmc.authoring.graphql") {
-        if (opts.params.body.variables.path === `${ROOT}/models`) {
+        const { itemId, path } = opts.params.body.variables;
+        if (itemId === START_ITEM_ID) return { data: { data: { item: { path: START_ITEM_PATH } } } };
+        if (path === `${START_ITEM_PATH}/models`) {
           return { data: { data: { item: { itemId: "MODELS-ITEM-ID", name: "Models" } } } };
         }
         return { data: { data: { item: null } } }; // /contact4 — MISS
@@ -222,10 +231,12 @@ describe("usePageScan", () => {
   });
 
   // Regression (defect fixed 2026-09-02) — the missing-root defect this
-  // component tolerated silently: no site root at all must not render as a
-  // clean page. Every internal finding is marked `could-not-check` and
-  // health.resolution is false.
-  it("a page context with no site root at all is loud, never a silently clean page", async () => {
+  // component tolerated silently: no startItemId at all (so no start item
+  // path can be resolved) must not render as a clean page. Every internal
+  // finding is marked `could-not-check` and health.resolution is false. No
+  // GraphQL call is made — resolveStartItemPath short-circuits when there is
+  // no startItemId, and there is nowhere left to look.
+  it("a page context with no startItemId at all is loud, never a silently clean page", async () => {
     const { stubClient, query, mutate } = createStubClient();
     let onSuccess: ((ctx: PagesContext) => void) | undefined;
     query.mockImplementation(((_key: string, opts?: { onSuccess?: (c: PagesContext) => void }) => {
@@ -239,7 +250,7 @@ describe("usePageScan", () => {
       data: { data: { pageId: "page-home", html: '<a href="/contact4">Missing</a>' } },
     } as never);
     onSuccess?.({
-      siteInfo: { language: "en" }, // no properties, no rootPath
+      siteInfo: { language: "en" }, // no properties, no startItemId
       pageInfo: { id: "page-home", name: "Home", path: "/", language: "en" },
     });
     await waitFor(() => expect(result.current.status).toBe("ready"));

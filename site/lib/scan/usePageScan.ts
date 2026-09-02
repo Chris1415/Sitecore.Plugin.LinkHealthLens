@@ -9,6 +9,7 @@ import { useAppContext, useMarketplaceClient } from "@/components/providers/mark
 import { extractAnchors } from "@/lib/scan/extractAnchors";
 import { classifyFindings } from "@/lib/scan/classifyFindings";
 import { resolveInternalFindings } from "@/lib/scan/resolveFindings";
+import { resolveStartItemPath } from "@/lib/scan/resolveStartItemPath";
 import { fetchPageHtml } from "@/lib/sdk/pagesGetPageHtml";
 import { computeAttributionRate, logAttributionRate } from "@/lib/scan/attributionRate";
 import { freshHealth, type PageScan } from "@/lib/model/types";
@@ -150,20 +151,27 @@ export function usePageScan(): UsePageScanResult {
         ctx.pageInfo?.presentationDetails,
       );
 
+      // Defect fix 2026-09-02: `siteInfo.properties.rootPath` is the SITE
+      // NODE, not the routable tree (its children are Home/Media/Data/
+      // Dictionary/Presentation/Settings) — site-relative hrefs resolve
+      // against the START ITEM instead. Resolved once per scan from
+      // `siteInfo.startItemId`, never hard-coded to `/Home`
+      // (docs/build-decisions.md). A missing/unresolvable start item yields
+      // `undefined`, which resolveInternalFindings already treats as a loud
+      // "missing site root" (could-not-check), never a silent site-node fallback.
+      const startItemPath = await resolveStartItemPath(client, {
+        startItemId: ctx.siteInfo?.startItemId,
+        language: page.language,
+        contextId,
+      });
+      if (cancelled || thisScanId !== scanIdRef.current) return;
+
       // TR-4 (ADR-0009): two-call CM resolution over every internal-scope
       // finding, de-duplicated by resolved path. Never blanks the panel on
       // failure (NFR-2) — a systemic failure degrades the health flag, a
       // partial one only marks the findings it actually touched.
       const { findings, health: resolutionHealth } = await resolveInternalFindings(stringChecked, {
-        // Defect fix 2026-09-02: the real tenant payload nests this under
-        // `siteInfo.properties.rootPath` (verified against a live capture —
-        // docs/build-decisions.md), not `siteInfo.rootPath` as the prior
-        // comment here asserted. Both sit behind an `[key: string]: any`
-        // index signature (PagesContextSiteInfo / its `properties`), so
-        // either read is type-safe; only the nested one is ever populated.
-        // The top-level fallback is kept in case a future payload shape
-        // reverts — never silently prefer a shape that doesn't exist.
-        siteRootPath: ctx.siteInfo?.properties?.rootPath ?? ctx.siteInfo?.rootPath,
+        siteRootPath: startItemPath,
         language: page.language,
         client,
         authoringContextId: contextId,

@@ -84,18 +84,21 @@ describe("T048 — prohibition gate 1 (FR-18): no outbound request to any link t
 });
 
 describe("T048 — prohibition gate 2 (FR-19): no mutation beyond the T037-sanctioned canvas call", () => {
-  // Three legitimate `client.mutate(...)` call sites exist, and only three
+  // Four legitimate `client.mutate(...)` call sites exist, and only four
   // (§ run brief): JumpAction.tsx's sanctioned canvas navigation
-  // (`pages.context`), plus TWO read-only GraphQL passthroughs the SDK
+  // (`pages.context`), plus THREE read-only GraphQL passthroughs the SDK
   // mis-types as mutations (`marketplace-sdk-xmc` § 6c) —
-  // resolveItemByPath.ts (`xmc.authoring.graphql`) and
-  // checkLiveViaEdge.ts (`xmc.live.graphql`). A naive "no client.mutate"
-  // grep would fail a correct build; the gate instead pins the EXACT
-  // allowed set and its keys, and fails on anything beyond it.
+  // resolveItemByPath.ts and resolveItemPathById.ts (both
+  // `xmc.authoring.graphql` — the latter added 2026-09-02 to resolve the
+  // START ITEM path, docs/build-decisions.md) and checkLiveViaEdge.ts
+  // (`xmc.live.graphql`). A naive "no client.mutate" grep would fail a
+  // correct build; the gate instead pins the EXACT allowed set and its keys,
+  // and fails on anything beyond it.
   const MUTATE_CALL = /client\.mutate\s*\(\s*["'`]([^"'`]+)["'`]/g;
   const ALLOWED: Record<string, string> = {
     "JumpAction.tsx": "pages.context",
     "resolveItemByPath.ts": "xmc.authoring.graphql",
+    "resolveItemPathById.ts": "xmc.authoring.graphql",
     "checkLiveViaEdge.ts": "xmc.live.graphql",
   };
 

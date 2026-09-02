@@ -837,3 +837,26 @@ added as a citable fixture alongside the existing `presentationDetails` one, and
 a real reason." The former now marks the finding `could-not-check` (the same status a genuine resolution
 failure gets) and flips `health.resolution` false, instead of returning a scan that renders identically to
 a page with no internal links at all.
+
+**§ `siteInfo.properties.rootPath` is the SITE NODE, not the routable base — fourth instance
+(fixed 2026-09-02).** The previous fix corrected WHERE `rootPath` lives in the payload but never
+questioned WHAT it points at. Verified against the live Velaro tenant: `rootPath` resolves to
+`/sitecore/content/Velaro-Brand/Velaro`, whose children are `Home, Media, Data, Dictionary, Presentation,
+Settings` — not a single page. Site-relative hrefs resolve against the site's START ITEM (a child of that
+node, here `Home`), which XM Cloud names separately via `siteInfo.startItemId`. Joining a path directly
+onto `rootPath` therefore built a path one level too shallow for every real href
+(`…/Velaro/models` instead of `…/Velaro/Home/models`), so 15 of 17 real, existing links on the live page
+reported `not-found` — the opposite failure mode from the previous fix (silently clean → confidently
+wrong), same root cause: a probed payload, read one hop off from what it actually names.
+
+Fix: `resolveStartItemPath` (new, `lib/scan/resolveStartItemPath.ts`) resolves `startItemId` to its own
+path via one Authoring GraphQL call (`resolveItemPathById`, new, `lib/sdk/resolveItemPathById.ts` —
+`item(where:{itemId,language}){path}`), run once per scan in `usePageScan` before
+`resolveInternalFindings`. The resolved path — never `/Home` hard-coded, never `properties.rootPath` — is
+what gets passed as `siteRootPath`. A missing or unresolvable `startItemId` returns `undefined` and
+degrades through the SAME loud "missing site root" path the previous fix built (`could-not-check` on
+affected findings, `health.resolution` false) — never a silent fallback to the site node, which is exactly
+the wrong base that produced the 15 false positives. Proven against the real captured page + site-info
+pair (`resolveFindings.startItemPath.real.test.ts`) with both a real HIT set (`/models`, `/brand`,
+`/Contact`, `/Editions`, `/Technology`, `/models/velaro-s`) and the one real MISS (`/contact4`) asserted
+in the same test, so a regression in either direction (everything resolves / nothing resolves) fails.
